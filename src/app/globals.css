@@ -55,4 +55,25 @@
   button {
     @apply cursor-pointer;
   }
+  #admin {
+    table {
+      @apply w-full border-collapse overflow-x-auto;
+      thead {
+        @apply bg-gray-100;
+      }
+      th {
+        @apply font-bold text-black;
+      }
+      td {
+        @apply nth-1:font-semibold;
+      }
+      th,
+      td {
+        @apply border border-gray-300 px-4 py-2 text-left;
+      }
+      button {
+        @apply p-2 hover:bg-gray-200 rounded-lg transition-colors;
+      }
+    }
+  }
 }

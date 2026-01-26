@@ -20,7 +20,7 @@
     "dotenv": "^17.2.1",
     "drizzle-orm": "^0.44.4",
     "gsap": "^3.14.2",
-    "lucide-react": "^0.475.0",
+    "lucide-react": "^0.563.0",
     "next": "16.1.4",
     "query-string": "^9.1.1",
     "react": "19.2.3",

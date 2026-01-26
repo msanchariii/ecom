@@ -4,7 +4,7 @@ import { getCurrentUser } from "@/lib/auth/actions";
 
 const Home = async () => {
   const user = await getCurrentUser();
-  const products = await getLatestProducts(3);
+  const products = await getLatestProducts(4);
 
   console.log("USER:", user);
 
@@ -14,7 +14,7 @@ const Home = async () => {
         <h2 id="latest" className="mb-6 text-heading-3 text-dark-900">
           Latest shoes
         </h2>
-        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {products.map((p) => {
             const price =
               p.minPrice !== null &&

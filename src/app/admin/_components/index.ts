@@ -1,0 +1,9 @@
+export { default as Sidebar } from "./Sidebar";
+export { default as DashboardOverview } from "./DashboardOverview";
+export { default as StatsCard } from "./StatsCard";
+export { default as ProductsTable } from "./ProductsTable";
+export { default as ProductForm } from "./ProductForm";
+export { default as OrdersTable } from "./OrdersTable";
+export { default as OrderDetails } from "./OrderDetails";
+export { default as CustomersTable } from "./CustomersTable";
+export { default as AnalyticsDashboard } from "./AnalyticsDashboard";

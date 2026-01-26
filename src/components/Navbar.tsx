@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
 import { useCartStore } from "@/store/cart";
-import { ShoppingCart } from "lucide-react";
+import { ShoppingCart, TextAlignJustify, Package } from "lucide-react";
 
 const NAV_LINKS = [
   { label: "Men", href: "/products?gender=men" },
@@ -52,9 +52,9 @@ export default function Navbar() {
         <div className="hidden items-center gap-6 md:flex">
           <Link
             href="/orders"
-            className="text-body text-dark-900 transition-colors hover:text-dark-700"
+            className="flex gap-2 items-center text-body text-dark-900 transition-colors hover:text-dark-700"
           >
-            My Orders
+            <Package /> My Orders
           </Link>
           <Link
             href="/cart"
@@ -72,9 +72,7 @@ export default function Navbar() {
           onClick={() => setOpen((v) => !v)}
         >
           <span className="sr-only">Toggle navigation</span>
-          <span className="mb-1 block h-0.5 w-6 bg-dark-900"></span>
-          <span className="mb-1 block h-0.5 w-6 bg-dark-900"></span>
-          <span className="block h-0.5 w-6 bg-dark-900"></span>
+          <TextAlignJustify />
         </button>
       </nav>
 
