@@ -35,7 +35,11 @@ export default function Card({
   className = "",
 }: CardProps) {
   const displayPrice =
-    price === undefined ? undefined : typeof price === "number" ? `$${price.toFixed(2)}` : price;
+    price === undefined
+      ? undefined
+      : typeof price === "number"
+        ? `$${price.toFixed(2)}`
+        : price;
   const content = (
     <article
       className={`group rounded-xl bg-light-100 ring-1 ring-light-300 transition-colors hover:ring-dark-500 ${className}`}
@@ -50,11 +54,17 @@ export default function Card({
         />
       </div>
       <div className="p-4">
-        <div className="mb-1 flex items-baseline justify-between gap-3">
-          <h3 className="text-heading-3 text-dark-900">{title}</h3>
-          {displayPrice && <span className="text-body-medium text-dark-900">{displayPrice}</span>}
+        <h3 className="mb-1 text-heading-3 text-dark-900">{title}</h3>
+        <div className=" flex items-baseline justify-between">
+          {description && (
+            <p className="text-body text-dark-700">{description}</p>
+          )}
+          {displayPrice && (
+            <span className="text-body-medium text-dark-900">
+              {displayPrice}
+            </span>
+          )}
         </div>
-        {description && <p className="text-body text-dark-700">{description}</p>}
         {subtitle && <p className="text-body text-dark-700">{subtitle}</p>}
         {meta && (
           <p className="mt-1 text-caption text-dark-700">

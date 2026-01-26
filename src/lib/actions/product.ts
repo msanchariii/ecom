@@ -1,8 +1,18 @@
-
-
 "use server";
 
-import { and, asc, count, desc, eq, ilike, inArray, isNull, or, sql, type SQL } from "drizzle-orm";
+import {
+  and,
+  asc,
+  count,
+  desc,
+  eq,
+  ilike,
+  inArray,
+  isNull,
+  or,
+  sql,
+  type SQL,
+} from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
   brands,
@@ -42,12 +52,16 @@ export type GetAllProductsResult = {
   totalCount: number;
 };
 
-export async function getAllProducts(filters: NormalizedProductFilters): Promise<GetAllProductsResult> {
+export async function getAllProducts(
+  filters: NormalizedProductFilters,
+): Promise<GetAllProductsResult> {
   const conds: SQL[] = [eq(products.isPublished, true)];
 
   if (filters.search) {
     const pattern = `%${filters.search}%`;
-    conds.push(or(ilike(products.name, pattern), ilike(products.description, pattern))!);
+    conds.push(
+      or(ilike(products.name, pattern), ilike(products.description, pattern))!,
+    );
   }
 
   if (filters.genderSlugs.length) {
@@ -64,20 +78,34 @@ export async function getAllProducts(filters: NormalizedProductFilters): Promise
 
   const hasSize = filters.sizeSlugs.length > 0;
   const hasColor = filters.colorSlugs.length > 0;
-  const hasPrice = !!(filters.priceMin !== undefined || filters.priceMax !== undefined || filters.priceRanges.length);
+  const hasPrice = !!(
+    filters.priceMin !== undefined ||
+    filters.priceMax !== undefined ||
+    filters.priceRanges.length
+  );
 
   const variantConds: SQL[] = [];
   if (hasSize) {
-    variantConds.push(inArray(productVariants.sizeId, db
-      .select({ id: sizes.id })
-      .from(sizes)
-      .where(inArray(sizes.slug, filters.sizeSlugs))));
+    variantConds.push(
+      inArray(
+        productVariants.sizeId,
+        db
+          .select({ id: sizes.id })
+          .from(sizes)
+          .where(inArray(sizes.slug, filters.sizeSlugs)),
+      ),
+    );
   }
   if (hasColor) {
-    variantConds.push(inArray(productVariants.colorId, db
-      .select({ id: colors.id })
-      .from(colors)
-      .where(inArray(colors.slug, filters.colorSlugs))));
+    variantConds.push(
+      inArray(
+        productVariants.colorId,
+        db
+          .select({ id: colors.id })
+          .from(colors)
+          .where(inArray(colors.slug, filters.colorSlugs)),
+      ),
+    );
   }
   if (hasPrice) {
     const priceBounds: SQL[] = [];
@@ -95,8 +123,14 @@ export async function getAllProducts(filters: NormalizedProductFilters): Promise
     }
     if (filters.priceMin !== undefined || filters.priceMax !== undefined) {
       const subConds: SQL[] = [];
-      if (filters.priceMin !== undefined) subConds.push(sql`(${productVariants.price})::numeric >= ${filters.priceMin}`);
-      if (filters.priceMax !== undefined) subConds.push(sql`(${productVariants.price})::numeric <= ${filters.priceMax}`);
+      if (filters.priceMin !== undefined)
+        subConds.push(
+          sql`(${productVariants.price})::numeric >= ${filters.priceMin}`,
+        );
+      if (filters.priceMax !== undefined)
+        subConds.push(
+          sql`(${productVariants.price})::numeric <= ${filters.priceMax}`,
+        );
       if (subConds.length) priceBounds.push(and(...subConds)!);
     }
     if (priceBounds.length) {
@@ -120,27 +154,36 @@ export async function getAllProducts(filters: NormalizedProductFilters): Promise
         .select({
           productId: productImages.productId,
           url: productImages.url,
-          rn: sql<number>`row_number() over (partition by ${productImages.productId} order by ${productImages.isPrimary} desc, ${productImages.sortOrder} asc)`.as("rn"),
+          rn: sql<number>`row_number() over (partition by ${productImages.productId} order by ${productImages.isPrimary} desc, ${productImages.sortOrder} asc)`.as(
+            "rn",
+          ),
         })
         .from(productImages)
-        .innerJoin(productVariants, eq(productVariants.id, productImages.variantId))
+        .innerJoin(
+          productVariants,
+          eq(productVariants.id, productImages.variantId),
+        )
         .where(
           inArray(
             productVariants.colorId,
-            db.select({ id: colors.id }).from(colors).where(inArray(colors.slug, filters.colorSlugs))
-          )
+            db
+              .select({ id: colors.id })
+              .from(colors)
+              .where(inArray(colors.slug, filters.colorSlugs)),
+          ),
         )
         .as("pi")
     : db
         .select({
           productId: productImages.productId,
           url: productImages.url,
-          rn: sql<number>`row_number() over (partition by ${productImages.productId} order by ${productImages.isPrimary} desc, ${productImages.sortOrder} asc)`.as("rn"),
+          rn: sql<number>`row_number() over (partition by ${productImages.productId} order by ${productImages.isPrimary} desc, ${productImages.sortOrder} asc)`.as(
+            "rn",
+          ),
         })
         .from(productImages)
         .where(isNull(productImages.variantId))
-        .as("pi")
-
+        .as("pi");
 
   const baseWhere = conds.length ? and(...conds) : undefined;
 
@@ -149,14 +192,16 @@ export async function getAllProducts(filters: NormalizedProductFilters): Promise
     maxPrice: sql<number | null>`max(${variantJoin.price})`,
   };
 
-  const imageAgg = sql<string | null>`max(case when ${imagesJoin.rn} = 1 then ${imagesJoin.url} else null end)`;
+  const imageAgg = sql<
+    string | null
+  >`max(case when ${imagesJoin.rn} = 1 then ${imagesJoin.url} else null end)`;
 
   const primaryOrder =
     filters.sort === "price_asc"
       ? asc(sql`min(${variantJoin.price})`)
       : filters.sort === "price_desc"
-      ? desc(sql`max(${variantJoin.price})`)
-      : desc(products.createdAt);
+        ? desc(sql`max(${variantJoin.price})`)
+        : desc(products.createdAt);
 
   const page = Math.max(1, filters.page);
   const limit = Math.max(1, Math.min(filters.limit, 60));
@@ -209,6 +254,37 @@ export async function getAllProducts(filters: NormalizedProductFilters): Promise
   return { products: productsOut, totalCount };
 }
 
+export async function getLatestProducts(
+  limit: number,
+): Promise<ProductListItem[]> {
+  const rows = await db
+    .select({
+      id: products.id,
+      name: products.name,
+      createdAt: products.createdAt,
+      minPrice: sql<number | null>`min(${productVariants.price}::numeric)`,
+      imageUrl: sql<
+        string | null
+      >`max(case when ${productImages.isPrimary} = true then ${productImages.url} else null end)`,
+    })
+    .from(products)
+    .leftJoin(productVariants, eq(productVariants.productId, products.id))
+    .leftJoin(productImages, eq(productImages.productId, products.id))
+    .where(eq(products.isPublished, true))
+    .groupBy(products.id, products.name, products.createdAt)
+    .orderBy(desc(products.createdAt), asc(products.id))
+    .limit(limit);
+
+  return rows.map((r) => ({
+    id: r.id,
+    name: r.name,
+    imageUrl: r.imageUrl,
+    minPrice: r.minPrice === null ? null : Number(r.minPrice),
+    maxPrice: r.minPrice === null ? null : Number(r.minPrice),
+    createdAt: r.createdAt,
+  }));
+}
+
 export type FullProduct = {
   product: SelectProduct & {
     brand?: SelectBrand | null;
@@ -224,7 +300,9 @@ export type FullProduct = {
   images: SelectProductImage[];
 };
 
-export async function getProduct(productId: string): Promise<FullProduct | null> {
+export async function getProduct(
+  productId: string,
+): Promise<FullProduct | null> {
   const rows = await db
     .select({
       productId: products.id,
@@ -254,7 +332,9 @@ export async function getProduct(productId: string): Promise<FullProduct | null>
       variantId: productVariants.id,
       variantSku: productVariants.sku,
       variantPrice: sql<number | null>`${productVariants.price}::numeric`,
-      variantSalePrice: sql<number | null>`${productVariants.salePrice}::numeric`,
+      variantSalePrice: sql<
+        number | null
+      >`${productVariants.salePrice}::numeric`,
       variantColorId: productVariants.colorId,
       variantSizeId: productVariants.sizeId,
       variantInStock: productVariants.inStock,
@@ -339,7 +419,8 @@ export async function getProduct(productId: string): Promise<FullProduct | null>
         productId: head.productId,
         sku: r.variantSku!,
         price: r.variantPrice !== null ? String(r.variantPrice) : "0",
-        salePrice: r.variantSalePrice !== null ? String(r.variantSalePrice) : null,
+        salePrice:
+          r.variantSalePrice !== null ? String(r.variantSalePrice) : null,
         colorId: r.variantColorId!,
         sizeId: r.variantSizeId!,
         inStock: r.variantInStock!,
@@ -424,7 +505,9 @@ export async function getProductReviews(productId: string): Promise<Review[]> {
   }));
 }
 
-export async function getRecommendedProducts(productId: string): Promise<RecommendedProduct[]> {
+export async function getRecommendedProducts(
+  productId: string,
+): Promise<RecommendedProduct[]> {
   const base = await db
     .select({
       id: products.id,
@@ -469,19 +552,19 @@ export async function getRecommendedProducts(productId: string): Promise<Recomme
       id: products.id,
       title: products.name,
       minPrice: sql<number | null>`min(${v.price})`,
-      imageUrl: sql<string | null>`max(case when ${pi.rn} = 1 then ${pi.url} else null end)`,
+      imageUrl: sql<
+        string | null
+      >`max(case when ${pi.rn} = 1 then ${pi.url} else null end)`,
       createdAt: products.createdAt,
     })
     .from(products)
     .leftJoin(v, eq(v.productId, products.id))
     .leftJoin(pi, eq(pi.productId, products.id))
-    .where(and(eq(products.isPublished, true), sql`${products.id} <> ${productId}`))
-    .groupBy(products.id, products.name, products.createdAt)
-    .orderBy(
-      desc(priority),
-      desc(products.createdAt),
-      asc(products.id)
+    .where(
+      and(eq(products.isPublished, true), sql`${products.id} <> ${productId}`),
     )
+    .groupBy(products.id, products.name, products.createdAt)
+    .orderBy(desc(priority), desc(products.createdAt), asc(products.id))
     .limit(8);
 
   const out: RecommendedProduct[] = [];
