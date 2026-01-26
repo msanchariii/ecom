@@ -2,9 +2,10 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useCartStore } from "@/store/cart";
 import { ShoppingCart, TextAlignJustify, Package } from "lucide-react";
+import { getCurrentUser } from "@/lib/auth/actions";
 
 const NAV_LINKS = [
   { label: "Men", href: "/products?gender=men" },
@@ -16,8 +17,13 @@ const NAV_LINKS = [
 
 export default function Navbar() {
   const [open, setOpen] = useState(false);
+  const [user, setUser] = useState<any>(null);
   const { getItemCount } = useCartStore();
   const cartCount = getItemCount();
+
+  useEffect(() => {
+    getCurrentUser().then((userData) => setUser(userData));
+  }, []);
 
   return (
     <header className="sticky top-0 z-50 bg-light-100 shadow">
@@ -48,20 +54,25 @@ export default function Navbar() {
             </li>
           ))}
         </ul>
-
+        {/* desktop */}
         <div className="hidden items-center gap-6 md:flex">
-          <Link
-            href="/orders"
-            className="flex gap-2 items-center text-body text-dark-900 transition-colors hover:text-dark-700"
-          >
-            <Package /> My Orders
-          </Link>
+          {user != null ? (
+            <Link
+              href="/orders"
+              className="flex gap-2 items-center text-body text-dark-900 transition-colors hover:text-dark-700"
+            >
+              <Package /> My Orders
+            </Link>
+          ) : (
+            <Link href="/sign-in">Login</Link>
+          )}
           <Link
             href="/cart"
             className="flex gap-2 items-center text-body text-dark-900 transition-colors hover:text-dark-700"
           >
             <ShoppingCart /> Cart ({cartCount})
           </Link>
+          {user && <Link href="/logout">Logout</Link>}
         </div>
 
         <button

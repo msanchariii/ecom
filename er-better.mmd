@@ -1,0 +1,447 @@
+erDiagram
+    %% ===== USER MANAGEMENT =====
+    users ||--o{ accounts : "OAuth providers"
+    users ||--o{ sessions : "active sessions"
+    users ||--o{ addresses : "saved addresses"
+    users ||--o{ carts : "shopping cart"
+    users ||--o{ orders : "places orders"
+    users ||--o{ reviews : "writes reviews"
+    users ||--o{ wishlists : "wishlist items"
+    users ||--o{ notifications : "receives"
+    users ||--o{ order_status_history : "admin changes"
+    users ||--o{ inventory_transactions : "makes adjustments"
+    users ||--o{ refunds : "processes"
+
+    %% ===== GUEST SYSTEM =====
+    guests ||--o{ carts : "guest browsing"
+
+    %% ===== PRODUCT CATALOG =====
+    categories ||--o{ categories : "parent-child hierarchy"
+    categories ||--o{ products : "contains"
+    brands ||--o{ products : "manufactures"
+    products ||--o{ product_variants : "has variants"
+    products ||--o{ product_images : "product-level images"
+    products ||--o{ reviews : "receives"
+    products ||--o{ wishlists : "saved by users"
+    products ||--o{ product_collections : "featured in"
+    products ||--o{ page_views : "tracked views"
+
+    %% ===== VARIANTS & ATTRIBUTES =====
+    colors ||--o{ product_variants : "variant color"
+    sizes ||--o{ product_variants : "variant size"
+    product_variants ||--o{ product_images : "variant-specific images"
+    product_variants ||--o{ cart_items : "in cart"
+    product_variants ||--o{ order_items : "ordered"
+    product_variants ||--o{ inventory_transactions : "stock changes"
+
+    %% ===== COLLECTIONS =====
+    collections ||--o{ product_collections : "includes products"
+
+    %% ===== CART SYSTEM =====
+    carts ||--o{ cart_items : "contains items"
+    carts ||--o{ abandoned_carts : "tracking"
+
+    %% ===== ORDER SYSTEM =====
+    orders ||--o{ order_items : "contains products"
+    orders ||--o{ payments : "payment records"
+    orders ||--o{ refunds : "refund records"
+    orders ||--o{ order_status_history : "audit trail"
+    orders }o--|| addresses : "shipping address"
+    orders }o--|| addresses : "billing address"
+
+    %% ===== PAYMENT SYSTEM =====
+    payments ||--o{ refunds : "refunded payments"
+
+    %% ===== COUPONS =====
+    coupons ||--o{ coupon_usage : "usage tracking"
+    coupon_usage }o--|| users : "used by"
+    coupon_usage }o--|| orders : "applied to"
+
+    %% ===== REVIEWS =====
+    reviews }o--|| orders : "verified purchase"
+
+    %% ===== VERIFICATION =====
+    verification_tokens }o--|| users : "email or phone verify"
+
+    %% ===== ENTITY DEFINITIONS =====
+
+    users {
+        uuid id PK
+        varchar name
+        varchar email UK
+        boolean email_verified
+        varchar password_hash
+        varchar phone
+        boolean phone_verified
+        varchar image
+        enum role
+        boolean is_active
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    accounts {
+        uuid id PK
+        uuid user_id FK
+        varchar provider
+        text provider_account_id
+        text access_token
+        text refresh_token
+        timestamp expires_at
+        varchar token_type
+        text scope
+        text id_token
+        timestamp created_at
+    }
+
+    sessions {
+        uuid id PK
+        uuid user_id FK
+        text token UK
+        varchar ip_address
+        text user_agent
+        timestamp expires_at
+        timestamp created_at
+    }
+
+    addresses {
+        uuid id PK
+        uuid user_id FK
+        enum type
+        varchar full_name
+        varchar phone
+        text line1
+        text line2
+        varchar city
+        varchar state
+        varchar country
+        varchar postal_code
+        boolean is_default
+        timestamp created_at
+    }
+
+    guests {
+        uuid id PK
+        text session_token UK
+        timestamp created_at
+        timestamp expires_at
+    }
+
+    categories {
+        uuid id PK
+        varchar name
+        varchar slug UK
+        text description
+        text image_url
+        uuid parent_id FK
+        integer sort_order
+        boolean is_active
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    brands {
+        uuid id PK
+        varchar name
+        varchar slug UK
+        text logo_url
+        text description
+        boolean is_active
+        timestamp created_at
+    }
+
+    colors {
+        uuid id PK
+        varchar name
+        varchar slug UK
+        varchar hex_code
+        integer sort_order
+    }
+
+    sizes {
+        uuid id PK
+        varchar name
+        varchar slug UK
+        varchar category
+        integer sort_order
+    }
+
+    products {
+        uuid id PK
+        varchar name
+        varchar slug UK
+        text description
+        uuid category_id FK
+        uuid brand_id FK
+        enum gender
+        varchar material
+        text care_instructions
+        varchar fit
+        varchar meta_title
+        text meta_description
+        boolean is_published
+        boolean is_featured
+        numeric min_price
+        numeric max_price
+        numeric average_rating
+        integer review_count
+        integer view_count
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    product_variants {
+        uuid id PK
+        uuid product_id FK
+        varchar sku UK
+        uuid color_id FK
+        uuid size_id FK
+        numeric price
+        numeric sale_price
+        numeric cost_price
+        integer in_stock
+        integer low_stock_threshold
+        integer max_quantity_per_order
+        numeric weight
+        json dimensions
+        boolean is_active
+        boolean is_default
+        timestamp created_at
+    }
+
+    product_images {
+        uuid id PK
+        uuid product_id FK
+        uuid variant_id FK
+        text url
+        varchar alt_text
+        integer sort_order
+        boolean is_primary
+        timestamp created_at
+    }
+
+    collections {
+        uuid id PK
+        varchar name
+        varchar slug UK
+        text description
+        text image_url
+        boolean is_active
+        integer sort_order
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    product_collections {
+        uuid product_id FK
+        uuid collection_id FK
+        timestamp added_at
+    }
+
+    carts {
+        uuid id PK
+        uuid user_id FK
+        uuid guest_id FK
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    cart_items {
+        uuid id PK
+        uuid cart_id FK
+        uuid product_variant_id FK
+        integer quantity
+        timestamp added_at
+        timestamp updated_at
+    }
+
+    wishlists {
+        uuid id PK
+        uuid user_id FK
+        uuid product_id FK
+        timestamp added_at
+    }
+
+    orders {
+        uuid id PK
+        varchar order_number UK
+        uuid user_id FK
+        enum status
+        enum payment_status
+        numeric subtotal
+        numeric tax
+        numeric shipping_cost
+        numeric discount
+        numeric total_amount
+        uuid shipping_address_id FK
+        uuid billing_address_id FK
+        varchar tracking_number
+        varchar carrier
+        timestamp estimated_delivery
+        timestamp shipped_at
+        timestamp delivered_at
+        text customer_notes
+        text admin_notes
+        varchar coupon_code
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    order_items {
+        uuid id PK
+        uuid order_id FK
+        uuid product_variant_id FK
+        varchar product_name
+        varchar variant_sku
+        varchar color_name
+        varchar size_name
+        text image_url
+        integer quantity
+        numeric price_at_purchase
+        numeric total_price
+        json product_snapshot
+    }
+
+    order_status_history {
+        uuid id PK
+        uuid order_id FK
+        enum from_status
+        enum to_status
+        text notes
+        uuid changed_by FK
+        timestamp changed_at
+    }
+
+    payments {
+        uuid id PK
+        uuid order_id FK
+        numeric amount
+        enum method
+        enum status
+        varchar gateway
+        text gateway_order_id
+        text gateway_payment_id
+        text gateway_signature
+        text failure_reason
+        varchar failure_code
+        json gateway_response
+        timestamp paid_at
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    refunds {
+        uuid id PK
+        uuid payment_id FK
+        uuid order_id FK
+        numeric amount
+        text reason
+        enum status
+        text gateway_refund_id
+        uuid processed_by FK
+        timestamp processed_at
+        timestamp created_at
+    }
+
+    inventory_transactions {
+        uuid id PK
+        uuid product_variant_id FK
+        enum type
+        integer quantity_change
+        integer quantity_after
+        varchar reference_type
+        uuid reference_id
+        text notes
+        uuid created_by FK
+        timestamp created_at
+    }
+
+    reviews {
+        uuid id PK
+        uuid product_id FK
+        uuid user_id FK
+        uuid order_id FK
+        integer rating
+        varchar title
+        text comment
+        boolean is_verified_purchase
+        enum status
+        integer helpful_count
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    coupons {
+        uuid id PK
+        varchar code UK
+        text description
+        enum discount_type
+        numeric discount_value
+        numeric min_order_value
+        numeric max_discount
+        integer max_total_usage
+        integer max_usage_per_user
+        integer current_usage_count
+        timestamp valid_from
+        timestamp valid_until
+        boolean is_active
+        json applicable_categories
+        json applicable_products
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    coupon_usage {
+        uuid id PK
+        uuid coupon_id FK
+        uuid user_id FK
+        uuid order_id FK
+        numeric discount_applied
+        timestamp used_at
+    }
+
+    page_views {
+        uuid id PK
+        uuid product_id FK
+        uuid category_id FK
+        uuid user_id FK
+        text session_id
+        varchar ip_address
+        text user_agent
+        text referrer
+        timestamp viewed_at
+    }
+
+    abandoned_carts {
+        uuid id PK
+        uuid cart_id FK
+        uuid user_id FK
+        varchar email
+        numeric total_value
+        integer item_count
+        boolean recovery_email_sent
+        timestamp recovery_email_sent_at
+        timestamp last_updated_at
+        timestamp created_at
+    }
+
+    notifications {
+        uuid id PK
+        uuid user_id FK
+        varchar type
+        varchar title
+        text message
+        text action_url
+        boolean is_read
+        timestamp read_at
+        timestamp created_at
+    }
+
+    verification_tokens {
+        uuid id PK
+        varchar identifier
+        text token UK
+        varchar type
+        timestamp expires_at
+        timestamp created_at
+    }

@@ -9,6 +9,7 @@ import { useGSAP } from "@gsap/react";
 
 const DiscountAnimation: React.FC<{ text: string[] }> = ({ text }) => {
   const containerRef = useRef<HTMLDivElement>(null);
+  const animationsRef = useRef<gsap.core.Tween[]>([]);
   const displayText = text.join("       |       ") + "       |       ";
 
   useGSAP(() => {
@@ -19,8 +20,9 @@ const DiscountAnimation: React.FC<{ text: string[] }> = ({ text }) => {
     const firstElem = textElements[0] as HTMLElement;
     const textWidth = firstElem.offsetWidth;
 
+    animationsRef.current = [];
     textElements.forEach((elem) => {
-      gsap.to(elem, {
+      const animation = gsap.to(elem, {
         x: `-=${textWidth}`,
         duration: 16,
         ease: "linear",
@@ -32,13 +34,24 @@ const DiscountAnimation: React.FC<{ text: string[] }> = ({ text }) => {
           },
         },
       });
+      animationsRef.current.push(animation);
     });
   }, [displayText]);
+
+  const handleMouseEnter = () => {
+    animationsRef.current.forEach((anim) => anim.pause());
+  };
+
+  const handleMouseLeave = () => {
+    animationsRef.current.forEach((anim) => anim.play());
+  };
 
   return (
     <div
       ref={containerRef}
       className="bg-black py-2 overflow-hidden whitespace-nowrap"
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
     >
       <div className="inline-flex">
         <div className="marquee-text px-4 whitespace-pre text-lg font-light text-light-100">
