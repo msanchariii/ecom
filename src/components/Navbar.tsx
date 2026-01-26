@@ -3,6 +3,8 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
+import { useCartStore } from "@/store/cart";
+import { ShoppingCart } from "lucide-react";
 
 const NAV_LINKS = [
   { label: "Men", href: "/products?gender=men" },
@@ -14,6 +16,8 @@ const NAV_LINKS = [
 
 export default function Navbar() {
   const [open, setOpen] = useState(false);
+  const { getItemCount } = useCartStore();
+  const cartCount = getItemCount();
 
   return (
     <header className="sticky top-0 z-50 bg-light-100 shadow">
@@ -46,12 +50,18 @@ export default function Navbar() {
         </ul>
 
         <div className="hidden items-center gap-6 md:flex">
-          <button className="text-body text-dark-900 transition-colors hover:text-dark-700">
-            Search
-          </button>
-          <button className="text-body text-dark-900 transition-colors hover:text-dark-700">
-            My Cart (2)
-          </button>
+          <Link
+            href="/orders"
+            className="text-body text-dark-900 transition-colors hover:text-dark-700"
+          >
+            My Orders
+          </Link>
+          <Link
+            href="/cart"
+            className="flex gap-2 items-center text-body text-dark-900 transition-colors hover:text-dark-700"
+          >
+            <ShoppingCart /> Cart ({cartCount})
+          </Link>
         </div>
 
         <button
@@ -84,9 +94,21 @@ export default function Navbar() {
               </Link>
             </li>
           ))}
-          <li className="flex items-center justify-between pt-2">
-            <button className="text-body">Search</button>
-            <button className="text-body">My Cart (2)</button>
+          <li className="flex flex-col gap-2 pt-2">
+            <Link
+              href="/orders"
+              className="text-body text-dark-900 hover:text-dark-700"
+              onClick={() => setOpen(false)}
+            >
+              My Orders
+            </Link>
+            <Link
+              href="/cart"
+              className="text-body"
+              onClick={() => setOpen(false)}
+            >
+              My Cart ({cartCount})
+            </Link>
           </li>
         </ul>
       </div>
