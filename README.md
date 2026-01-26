@@ -14,3 +14,8 @@
 - green
 - red
 - orange
+
+# Todo:
+
+[] Admin Panel
+[] Add Review (in My Orders, allow only if user has received the product)

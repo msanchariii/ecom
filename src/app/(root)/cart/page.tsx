@@ -53,7 +53,7 @@ export default function CartPage() {
             {items.map((item) => (
               <div
                 key={item.id}
-                className="flex gap-4 rounded-lg border border-light-300 bg-light-100 p-4 transition-shadow hover:shadow-md"
+                className="flex gap-4 rounded-lg border border-light-300 bg-light-100 p-4 transition-shadow hover:shadow"
               >
                 {/* Product Image */}
                 <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-md bg-light-200">

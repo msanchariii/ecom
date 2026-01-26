@@ -101,9 +101,9 @@ async function AlsoLikeSection({ productId }: { productId: string }) {
   const recs: RecommendedProduct[] = await getRecommendedProducts(productId);
   if (!recs.length) return null;
   return (
-    <section className="mt-16">
+    <section className="my-16">
       <h2 className="mb-6 text-heading-3 text-dark-900">You Might Also Like</h2>
-      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {recs.map((p) => (
           <Card
             key={p.id}
@@ -274,11 +274,11 @@ export default async function ProductDetailPage({
 
       <Suspense
         fallback={
-          <section className="mt-16">
+          <section className="mt-16 pb-16">
             <h2 className="mb-6 text-heading-3 text-dark-900">
               You Might Also Like
             </h2>
-            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="grid  grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
               {Array.from({ length: 3 }).map((_, i) => (
                 <div
                   key={i}
