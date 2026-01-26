@@ -1,9 +1,9 @@
-import { Icon } from "lucide-react";
+import { LucideIcon } from "lucide-react";
 
 interface StatsCardProps {
   title: string;
   value: string | number;
-  icon: Icon;
+  icon: LucideIcon;
   trend?: {
     value: number;
     isPositive: boolean;
