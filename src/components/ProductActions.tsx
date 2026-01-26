@@ -8,10 +8,16 @@ import { useState } from "react";
 type Variant = {
   id: string;
   price: string;
-  salePrice: string | null | undefined;
-  color: { name: string; hex: string } | null;
-  size: { name: string; slug: string; sortOrder?: number } | null;
-  inStock: number;
+  salePrice?: string | null | undefined;
+  color?:
+    | { name: string; slug: string; hexCode: string; id: string }
+    | null
+    | undefined;
+  size?:
+    | { name: string; slug: string; sortOrder?: number; id: string }
+    | null
+    | undefined;
+  inStock?: number | undefined;
 };
 
 type ProductActionsProps = {
@@ -65,7 +71,9 @@ export default function ProductActions({
   };
 
   const uniqueSizes = Array.from(
-    new Set(variants.filter((v) => v.inStock > 0).map((v) => v.size?.name)),
+    new Set(
+      variants.filter((v) => (v.inStock ?? 0) > 0).map((v) => v.size?.name),
+    ),
   ).filter(Boolean);
 
   return (
