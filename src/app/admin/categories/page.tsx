@@ -1,12 +1,17 @@
+import { Button } from "@/components/ui/button";
 import { getCategories } from "../_actions/categories";
+import Link from "next/link";
 
 export default async function CategoriesPage() {
   const categories = await getCategories();
 
   return (
     <div className="space-y-6">
-      <div>
+      <div className="w-full flex justify-between">
         <h1 className="text-3xl font-bold text-gray-900">Categories</h1>
+        <Button asChild> 
+          <Link href="/admin/categories/add">Add Category</Link>
+        </Button>
       </div>
       <div className="bg-white rounded-lg shadow border border-gray-200 p-8">
         {categories.map((category) => (
