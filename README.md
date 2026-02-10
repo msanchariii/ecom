@@ -26,6 +26,172 @@
 [] Add Image Upload using AWS S3
 [] Add table for top animation bar
 
+# Features
+
+### 🧑‍💼 User & Authentication
+
+User registration with email and phone verification
+
+OAuth provider support (Google, GitHub, etc.)
+
+Secure session management
+
+Role-based users (admin / customer)
+
+Guest checkout support
+
+Address book with default shipping & billing addresses
+
+### 🛍️ Product Catalog
+
+Hierarchical categories (parent–child structure)
+
+Brand management
+
+Product collections (featured, seasonal, curated lists)
+
+Product variants with size & color support
+
+Variant-level pricing, stock, and limits
+
+Product & variant image management
+
+SEO-ready fields (slug, meta title, meta description)
+
+Product visibility controls (publish, feature, activate)
+
+### 🧺 Cart & Wishlist
+
+Persistent carts for users and guests
+
+Automatic cart linking on login
+
+Cart item quantity management
+
+Wishlist support for saved products
+
+Abandoned cart tracking for recovery workflows
+
+### 📦 Orders & Checkout
+
+Complete order lifecycle management
+
+Order status tracking with full history
+
+Shipping & billing address snapshotting
+
+Order item snapshot (price, SKU, image, product details)
+
+Coupon and discount application
+
+Customer notes and admin notes
+
+Shipment tracking and delivery timestamps
+
+### 💳 Payments & Refunds
+
+Multiple payment methods support
+
+Payment gateway integration ready
+
+Payment failure tracking and debugging
+
+Refund processing with audit trail
+
+Partial and full refunds supported
+
+Gateway response logging for reconciliation
+
+### 🧮 Inventory Management
+
+Variant-level stock control
+
+Inventory transaction ledger (additions, deductions, adjustments)
+
+Low-stock alerts and thresholds
+
+Order-linked inventory deductions
+
+Manual admin stock corrections with audit logs
+
+### 🎟️ Coupons & Promotions
+
+Fixed and percentage-based discounts
+
+Validity windows and usage limits
+
+Per-user and global usage tracking
+
+Category and product-level applicability
+
+Coupon abuse prevention via usage history
+
+### ⭐ Reviews & Ratings
+
+Product reviews with ratings
+
+Verified purchase enforcement
+
+Review moderation support
+
+Helpful vote tracking
+
+Review statistics stored on products
+
+### 🔔 Notifications
+
+User notification system
+
+Read/unread tracking
+
+Actionable notifications (links to orders, products, etc.)
+
+### 📊 Analytics & Tracking
+
+Product and category page view tracking
+
+User and guest activity tracking
+
+Cart abandonment insights
+
+Review and rating aggregation
+
+Order and revenue-ready data model
+
+### 🛡️ Admin & Audit Safety
+
+Full order status change history
+
+Inventory adjustment tracking with actor reference
+
+Refund processing accountability
+
+Payment failure and retry visibility
+
+Clear separation of customer vs admin actions
+
+### ⚙️ Architecture & Scalability
+
+Designed for PostgreSQL with strong relational integrity
+
+Migration-friendly schema (V1 → V2 evolution)
+
+Monolith-friendly but microservice-ready
+
+Snapshot-based orders for historical correctness
+
+Extensible for future features like warehouses, vendors, or subscriptions
+
+### 🚀 Built for Growth
+
+Start simple, scale without rewrites
+
+Suitable for real-world D2C brands
+
+Freelancer and agency-friendly architecture
+
+Production-tested patterns (not tutorial abstractions)
+
 # Claude Suggestions
 
 1. Variant-Based Architecture

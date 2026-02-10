@@ -254,6 +254,33 @@ export async function getAllProducts(
   return { products: productsOut, totalCount };
 }
 
+export async function getProductsForAdmin(): Promise<ProductListItem[]> {
+  const rows = await db
+    .select({
+      id: products.id,
+      name: products.name,
+      createdAt: products.createdAt,
+      subtitle: genders.label,
+      minPrice: sql<number | null>`min(${productVariants.price})`,
+      maxPrice: sql<number | null>`max(${productVariants.price})`,
+    })
+    .from(products)
+    .leftJoin(productVariants, eq(productVariants.productId, products.id))
+    .leftJoin(genders, eq(genders.id, products.genderId))
+    .groupBy(products.id, products.name, products.createdAt, genders.label)
+    .orderBy(desc(products.createdAt), asc(products.id));
+
+  return rows.map((r) => ({
+    id: r.id,
+    name: r.name,
+    imageUrl: null,
+    minPrice: r.minPrice === null ? null : Number(r.minPrice),
+    maxPrice: r.maxPrice === null ? null : Number(r.maxPrice),
+    createdAt: r.createdAt,
+    subtitle: r.subtitle ? `${r.subtitle} Shoes` : null,
+  }));
+}
+
 export async function getLatestProducts(
   limit: number,
 ): Promise<ProductListItem[]> {
