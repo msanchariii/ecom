@@ -1,18 +1,23 @@
-import { pgTable, text, uuid, foreignKey } from 'drizzle-orm/pg-core';
-import { relations } from 'drizzle-orm';
-import { z } from 'zod';
+import { pgTable, text, uuid, foreignKey, boolean } from "drizzle-orm/pg-core";
+import { relations } from "drizzle-orm";
+import { z } from "zod";
 
-export const categories = pgTable('categories', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  name: text('name').notNull(),
-  slug: text('slug').notNull().unique(),
-  parentId: uuid('parent_id'),
-}, (t) => ({
-  parentFk: foreignKey({
-    columns: [t.parentId],
-    foreignColumns: [t.id],
-  }).onDelete('set null'),
-}));
+export const categories = pgTable(
+  "categories",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    name: text("name").notNull(),
+    slug: text("slug").notNull().unique(),
+    isDeleted: boolean("is_deleted").default(false),
+    parentId: uuid("parent_id"),
+  },
+  (t) => ({
+    parentFk: foreignKey({
+      columns: [t.parentId],
+      foreignColumns: [t.id],
+    }).onDelete("set null"),
+  }),
+);
 
 export const categoriesRelations = relations(categories, ({ many, one }) => ({
   parent: one(categories, {
