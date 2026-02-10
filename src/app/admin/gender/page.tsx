@@ -25,16 +25,16 @@ const GenderPage = async () => {
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>ID</TableHead>
+            <TableHead className="max-w-1">ID</TableHead>
             <TableHead className="max-w-6">Label</TableHead>
             <TableHead className="max-w-6">Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
-          {genders.map((gender) => (
+          {genders.map((gender, i) => (
             <TableRow key={gender.id}>
-              <TableCell className="font-medium bg-gray-100 max-w-8">
-                {gender.id}
+              <TableCell className="font-medium bg-gray-100 max-w-1">
+                {i + 1}
               </TableCell>
               <TableCell className="max-w-6">{gender.label}</TableCell>
               <TableCell className="max-w-6">

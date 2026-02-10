@@ -1,11 +1,58 @@
-export default function BrandsPage() {
+import {
+  Table,
+  TableBody,
+  TableCaption,
+  TableCell,
+  TableFooter,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { getBrands } from "../_actions/brands";
+import { Button } from "@/components/ui/button";
+import Link from "next/link";
+import Image from "next/image";
+
+export default async function BrandsPage() {
+  const brands = await getBrands();
+
   return (
     <div className="space-y-6">
       <h1 className="text-3xl font-bold text-gray-900">Brands</h1>
       <div className="bg-white rounded-lg shadow border border-gray-200 p-8">
-        <p className="text-gray-600 text-center">
-          Brands management coming soon...
-        </p>
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Name</TableHead>
+                <TableHead>Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {brands.map((brand) => (
+                <TableRow key={brand.id}>
+                  <TableCell>
+                    <Image
+                      src={brand.logoUrl || "/placeholder.png"}
+                      alt={brand.name}
+                      width={64}
+                      height={64}
+                      className="inline-block mr-2 rounded border size-16 shadow object-cover"
+                    />
+                    {brand.name}
+                  </TableCell>
+                  <TableCell>
+                    <Button asChild className=" transition-colors">
+                      <Link href={`/admin/brands/edit?id=${brand.id}`}>
+                        Edit
+                      </Link>
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
       </div>
     </div>
   );
