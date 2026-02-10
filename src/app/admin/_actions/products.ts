@@ -5,8 +5,15 @@
 // * DELETE /admin/products/:id
 
 import { db } from "@/lib/db";
-import { brands, categories, genders, products } from "@/lib/db/schema";
+import {
+  brands,
+  categories,
+  genders,
+  InsertProduct,
+  products,
+} from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
+import { randomUUID } from "crypto";
 
 export const getProducts = async () => {
   const rows = await db
@@ -31,4 +38,16 @@ export const getProducts = async () => {
   console.log("Products:", results);
 
   return results;
+};
+
+export const addProduct = async (data: InsertProduct) => {
+  const rows = await db
+    .insert(products)
+    .values({
+      ...data,
+      id: randomUUID(),
+    })
+    .returning();
+  console.log("Added Product:", rows);
+  return rows[0];
 };
