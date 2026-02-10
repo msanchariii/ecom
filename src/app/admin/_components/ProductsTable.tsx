@@ -1,6 +1,7 @@
 import { getProductsForAdmin } from "@/lib/actions/product";
 import { Plus, Search, Edit, Trash2, Eye } from "lucide-react";
 import { getProducts } from "../_actions/products";
+import Link from "next/link";
 
 type Product = {
   id: string;
@@ -20,8 +21,10 @@ export default async function ProductsTable() {
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold text-gray-900">Products</h1>
         <button className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors">
-          <Plus className="w-5 h-5" />
+         <Link href="/admin/products/add" className="flex items-center gap-2">
+          <Plus className="w-4 h-4" />
           Add Product
+          </Link>
         </button>
       </div>
       <div className="bg-white rounded-lg shadow overflow-hidden">

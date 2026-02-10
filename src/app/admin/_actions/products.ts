@@ -6,48 +6,76 @@
 
 import { db } from "@/lib/db";
 import {
-  brands,
-  categories,
-  genders,
-  InsertProduct,
-  products,
+    brands,
+    categories,
+    genders,
+    InsertProduct,
+    products,
 } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { randomUUID } from "crypto";
 
 export const getProducts = async () => {
-  const rows = await db
-    .select()
-    .from(products)
-    .leftJoin(brands, eq(products.brandId, brands.id))
-    .leftJoin(categories, eq(products.categoryId, categories.id))
-    .leftJoin(genders, eq(products.genderId, genders.id))
-    .groupBy(products.id, brands.id, categories.id, genders.id);
-  const results = rows.map((row) => ({
-    id: row.products.id,
-    name: row.products.name,
-    imageUrl: null, // Placeholder for image URL
-    minPrice: null, // Placeholder for minimum price
-    maxPrice: null, // Placeholder for maximum price
-    isPublished: row.products.isPublished,
-    createdAt: row.products.createdAt,
-    brandName: row.brands?.name || null,
-    category: row.categories?.name || null,
-    gender: row.genders?.label || null,
-  }));
-  console.log("Products:", results);
+    const rows = await db
+        .select()
+        .from(products)
+        .leftJoin(brands, eq(products.brandId, brands.id))
+        .leftJoin(categories, eq(products.categoryId, categories.id))
+        .leftJoin(genders, eq(products.genderId, genders.id))
+        .groupBy(products.id, brands.id, categories.id, genders.id);
+    const results = rows.map((row) => ({
+        id: row.products.id,
+        name: row.products.name,
+        imageUrl: null, // Placeholder for image URL
+        minPrice: null, // Placeholder for minimum price
+        maxPrice: null, // Placeholder for maximum price
+        isPublished: row.products.isPublished,
+        createdAt: row.products.createdAt,
+        brandName: row.brands?.name || null,
+        category: row.categories?.name || null,
+        gender: row.genders?.label || null,
+    }));
+    console.log("Products:", results);
 
-  return results;
+    return results;
 };
 
 export const addProduct = async (data: InsertProduct) => {
-  const rows = await db
-    .insert(products)
-    .values({
-      ...data,
-      id: randomUUID(),
-    })
-    .returning();
-  console.log("Added Product:", rows);
-  return rows[0];
+    const rows = await db
+        .insert(products)
+        .values({
+            ...data,
+            id: randomUUID(),
+        })
+        .returning();
+    console.log("Added Product:", rows);
+    return rows[0];
+};
+
+export const getProductById = async (id: string) => {
+    const rows = await db
+        .select()
+        .from(products)
+        .where(eq(products.id, id))
+        .limit(1);
+    if (rows.length === 0) {
+        return null;
+    }
+    return rows[0];
+};
+
+export const updateProduct = async (
+    id: string,
+    data: Partial<InsertProduct>,
+) => {
+    const rows = await db
+        .update(products)
+        .set({
+            ...data,
+            updatedAt: new Date(),
+        })
+        .where(eq(products.id, id))
+        .returning();
+    console.log("Updated Product:", rows);
+    return rows[0];
 };
