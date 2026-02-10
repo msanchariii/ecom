@@ -12,6 +12,7 @@ import {
   FolderTree,
   Palette,
   BarChart3,
+  User,
 } from "lucide-react";
 
 const navItems = [
@@ -54,6 +55,11 @@ const navItems = [
     name: "Analytics",
     href: "/admin/analytics",
     icon: BarChart3,
+  },
+  {
+    name: "Gender",
+    href: "/admin/gender",
+    icon: User,
   },
   {
     name: "Settings",
