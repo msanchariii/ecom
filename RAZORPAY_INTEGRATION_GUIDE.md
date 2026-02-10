@@ -7,6 +7,7 @@ A secure, type-safe, and production-ready Razorpay payment integration for Next.
 - ✅ **Server-side order creation** - Secure order generation on the backend
 - ✅ **Payment signature verification** - Server-side signature validation for security
 - ✅ **TypeScript type safety** - Fully typed interfaces and components
+- ✅ **Axios for HTTP requests** - Modern, promise-based HTTP client
 - ✅ **Modern UX** - Toast notifications instead of alerts
 - ✅ **Error handling** - Comprehensive error handling and user feedback
 - ✅ **Loading states** - Clear loading indicators during payment flow
@@ -18,7 +19,11 @@ A secure, type-safe, and production-ready Razorpay payment integration for Next.
 
 1. **Razorpay Account**: Sign up at [razorpay.com](https://razorpay.com)
 2. **API Keys**: Get your keys from Razorpay Dashboard
-3. **Environment Variables**: Configure the following in `.env.local`:
+3. **Dependencies**: Install required packages:
+   ```bash
+   npm install axios razorpay
+   ```
+4. **Environment Variables**: Configure the following in `.env.local`:
 
 ```env
 # Razorpay Keys

@@ -2,6 +2,7 @@
 
 import React, { useState, useCallback } from "react";
 import Script from "next/script";
+import axios from "axios";
 import { toast } from "sonner";
 import { Button } from "./ui/button";
 import type {
@@ -28,16 +29,7 @@ interface PaymentProps {
   notes?: Record<string, string>;
 }
 
-/**
- * Modern Razorpay Payment Component
- *
- * Features:
- * - Server-side order creation
- * - Server-side payment verification using signature
- * - Proper error handling with toast notifications
- * - TypeScript type safety
- * - Loading states and better UX
- * - Secure payment flow
+/*
  *
  * Usage:
  * ```tsx
@@ -77,28 +69,28 @@ const Payment: React.FC<PaymentProps> = ({
   const verifyPayment = useCallback(
     async (response: RazorpaySuccessResponse): Promise<boolean> => {
       try {
-        const verifyResponse = await fetch("/api/payment/verify", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
+        const { data } = await axios.post<VerifyPaymentResponse>(
+          "/api/payment/verify",
+          {
             razorpay_order_id: response.razorpay_order_id,
             razorpay_payment_id: response.razorpay_payment_id,
             razorpay_signature: response.razorpay_signature,
             customerData,
-          }),
-        });
+          },
+        );
 
-        const data: VerifyPaymentResponse = await verifyResponse.json();
-
-        if (!verifyResponse.ok || !data.success) {
+        if (!data.success) {
           throw new Error(data.message || "Payment verification failed");
         }
 
         return true;
       } catch (error) {
         console.error("Payment verification error:", error);
+        if (axios.isAxiosError(error)) {
+          throw new Error(
+            error.response?.data?.message || "Payment verification failed",
+          );
+        }
         throw error;
       }
     },
@@ -131,24 +123,19 @@ const Payment: React.FC<PaymentProps> = ({
       // Step 1: Create order on server
       toast.loading("Initializing payment...");
 
-      const orderResponse = await fetch("/api/payment/create-order", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
+      const { data: orderData } = await axios.post<CreateOrderResponse>(
+        "/api/payment/create-order",
+        {
           amount: amountInPaise,
           currency,
           customerData,
           notes,
-        }),
-      });
-
-      const orderData: CreateOrderResponse = await orderResponse.json();
+        },
+      );
 
       toast.dismiss();
 
-      if (!orderResponse.ok || orderData.error) {
+      if (orderData.error) {
         throw new Error(orderData.error || "Failed to create order");
       }
 
@@ -223,8 +210,12 @@ const Payment: React.FC<PaymentProps> = ({
     } catch (error) {
       console.error("Payment error:", error);
 
-      const errorMessage =
-        error instanceof Error ? error.message : "Payment failed";
+      let errorMessage = "Payment failed";
+      if (axios.isAxiosError(error)) {
+        errorMessage = error.response?.data?.error || error.message;
+      } else if (error instanceof Error) {
+        errorMessage = error.message;
+      }
       toast.error(errorMessage);
 
       const err = error instanceof Error ? error : new Error("Payment failed");
