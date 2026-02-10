@@ -1,4 +1,4 @@
-import { PutObjectCommand } from "@aws-sdk/client-s3";
+import { PutObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import {
   s3Client,
@@ -49,7 +49,7 @@ export async function POST(req: Request) {
       ContentType: fileType,
     });
 
-    const uploadUrl = await getSignedUrl(s3Client, command, { expiresIn: 300 }); // 5 minutes
+    const uploadUrl = await getSignedUrl(s3Client, command, { expiresIn: 60 }); // 1 minutes
 
     // Construct the public URL (without query parameters)
     const publicUrl = getS3PublicUrl(key);
@@ -65,5 +65,41 @@ export async function POST(req: Request) {
       { error: "Failed to generate upload URL" },
       { status: 500 },
     );
+  }
+}
+
+export async function DELETE(req: Request) {
+  try {
+    // Validate environment variables
+    if (
+      !process.env.AWS_REGION ||
+      !process.env.AWS_ACCESS_KEY ||
+      !process.env.AWS_SECRET_KEY ||
+      !process.env.AWS_BUCKET_NAME
+    ) {
+      return Response.json(
+        { error: "Missing AWS configuration" },
+        { status: 500 },
+      );
+    }
+
+    const { key } = await req.json();
+
+    // Validate input
+    if (!key) {
+      return Response.json({ error: "key is required" }, { status: 400 });
+    }
+
+    const command = new DeleteObjectCommand({
+      Bucket: process.env.AWS_BUCKET_NAME!,
+      Key: key,
+    });
+
+    await s3Client.send(command);
+
+    return Response.json({ success: true });
+  } catch (error) {
+    console.error("Error deleting from S3:", error);
+    return Response.json({ error: "Failed to delete file" }, { status: 500 });
   }
 }
