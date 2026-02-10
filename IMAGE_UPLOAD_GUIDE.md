@@ -30,14 +30,21 @@ Modular functions for S3 operations:
 "use client";
 import { useState } from "react";
 import ImageUpload from "@/components/ImageUpload";
-import { replaceFileInS3 } from "@/lib/upload/client";
+import { replaceFileInS3, deleteFileFromS3 } from "@/lib/upload/client";
 
 export default function BrandForm({ brand }: { brand?: SelectBrand }) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [imageRemoved, setImageRemoved] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleFileSelect = (file: File | null) => {
     setSelectedFile(file);
+    // Track if user explicitly removed the image
+    if (file === null && brand?.logoUrl) {
+      setImageRemoved(true);
+    } else {
+      setImageRemoved(false);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -47,12 +54,17 @@ export default function BrandForm({ brand }: { brand?: SelectBrand }) {
     try {
       let imageUrl = brand?.logoUrl || null;
 
-      // Upload only when form is submitted
-      if (selectedFile) {
+      // Handle image removal - delete from S3
+      if (imageRemoved && brand?.logoUrl) {
+        await deleteFileFromS3(brand.logoUrl);
+        imageUrl = null;
+      }
+      // Upload new file and replace old one
+      else if (selectedFile) {
         imageUrl = await replaceFileInS3(brand?.logoUrl, selectedFile);
       }
 
-      // Save to database with the S3 URL
+      // Save to database with the S3 URL (or null if removed)
       await saveBrand({ ...formData, logoUrl: imageUrl });
     } catch (err) {
       console.error(err);
@@ -82,21 +94,46 @@ export default function BrandForm({ brand }: { brand?: SelectBrand }) {
 
 ## Key Features
 
-✅ **Deferred Upload** - Images only upload to S3 when form is submitted
-✅ **Auto Cleanup** - Old images are deleted when replaced
-✅ **Modular** - Components can be reused across all forms
-✅ **Drag & Drop** - Built-in drag-and-drop support
-✅ **Preview** - Shows local preview before upload
+✅ **Deferred Upload** - Images only upload to S3 when form is submitted  
+✅ **Auto Cleanup on Replace** - Old images are automatically deleted when replaced with new ones  
+✅ **Auto Cleanup on Remove** - Images are deleted from S3 when removed (X button)  
+✅ **Modular** - Components can be reused across all forms  
+✅ **Drag & Drop** - Built-in drag-and-drop support  
+✅ **Preview** - Shows local preview before upload  
 ✅ **Error Handling** - Graceful error handling with user feedback
+
+## S3 Deletion Behavior
+
+The system intelligently handles S3 file cleanup:
+
+1. **Replace Image**: When editing and uploading a new image
+   - ✅ New image uploaded to S3
+   - ✅ Old image deleted from S3
+   - ✅ Database updated with new URL
+
+2. **Remove Image**: When clicking X to remove the image
+   - ✅ Old image deleted from S3
+   - ✅ Database updated with `null`
+
+3. **No Change**: When submitting without touching the image
+   - ✅ No S3 operations
+   - ✅ Existing URL preserved in database
 
 ## Usage for Other Forms
 
 Simply copy the pattern from the Brand form:
 
-1. Import `ImageUpload` component and `replaceFileInS3` utility
-2. Add state for `selectedFile`
+1. Import `ImageUpload` component and both `replaceFileInS3` and `deleteFileFromS3` utilities
+2. Add state for `selectedFile` and `imageRemoved`
 3. Use `ImageUpload` component in JSX
-4. Call `replaceFileInS3()` in form submit handler
+4. Track removal in `handleFileSelect` callback
+5. Handle both replacement and removal in form submit handler
+
+**Important**: Always track `imageRemoved` separately to distinguish between:
+
+- User didn't touch the image (keep existing)
+- User clicked X to remove (delete from S3)
+- User uploaded new file (replace in S3)
 
 The same pattern works for:
 

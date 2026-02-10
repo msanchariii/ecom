@@ -49,7 +49,7 @@ export async function POST(req: Request) {
       ContentType: fileType,
     });
 
-    const uploadUrl = await getSignedUrl(s3Client, command, { expiresIn: 300 }); // 5 minutes
+    const uploadUrl = await getSignedUrl(s3Client, command, { expiresIn: 60 }); // 1 minutes
 
     // Construct the public URL (without query parameters)
     const publicUrl = getS3PublicUrl(key);

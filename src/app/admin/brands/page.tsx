@@ -18,7 +18,12 @@ export default async function BrandsPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-3xl font-bold text-gray-900">Brands</h1>
+      <div className="flex justify-between items-center">
+        <h1 className="text-3xl font-bold text-gray-900">Brands</h1>
+        <Button asChild className="mt-4 transition-colors">
+          <Link href="/admin/brands/add">Add Brand</Link>
+        </Button>
+      </div>
       <div className="bg-white rounded-lg shadow border border-gray-200 p-8">
         <div className="overflow-x-auto">
           <Table>
@@ -37,7 +42,7 @@ export default async function BrandsPage() {
                       alt={brand.name}
                       width={64}
                       height={64}
-                      className="inline-block mr-2 rounded border size-16 shadow object-cover"
+                      className="inline-block mr-2 rounded border size-16 shadow object-contain"
                     />
                     {brand.name}
                   </TableCell>

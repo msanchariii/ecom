@@ -4,7 +4,7 @@ import { insertBrandSchema, SelectBrand } from "@/lib/db/schema";
 import { addBrand, updateBrand } from "../_actions/brands";
 import { useRouter } from "next/navigation";
 import ImageUpload from "@/components/ImageUpload";
-import { replaceFileInS3 } from "@/lib/upload/client";
+import { replaceFileInS3, deleteFileFromS3 } from "@/lib/upload/client";
 
 export default function BrandForm({ brand }: { brand?: SelectBrand }) {
   const router = useRouter();
@@ -13,6 +13,7 @@ export default function BrandForm({ brand }: { brand?: SelectBrand }) {
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [imageRemoved, setImageRemoved] = useState(false);
 
   // Auto-generate slug from name
   useEffect(() => {
@@ -28,6 +29,12 @@ export default function BrandForm({ brand }: { brand?: SelectBrand }) {
 
   const handleFileSelect = (file: File | null) => {
     setSelectedFile(file);
+    // Track if user explicitly removed the image
+    if (file === null && brand?.logoUrl) {
+      setImageRemoved(true);
+    } else {
+      setImageRemoved(false);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -38,8 +45,13 @@ export default function BrandForm({ brand }: { brand?: SelectBrand }) {
     try {
       let finalLogoUrl = brand?.logoUrl || null;
 
-      // Upload file to S3 and delete old file if a new file was selected
-      if (selectedFile) {
+      // Handle image removal - delete from S3
+      if (imageRemoved && brand?.logoUrl) {
+        await deleteFileFromS3(brand.logoUrl);
+        finalLogoUrl = null;
+      }
+      // Upload new file and delete old file if a new file was selected
+      else if (selectedFile) {
         finalLogoUrl = await replaceFileInS3(brand?.logoUrl, selectedFile);
       }
 
