@@ -125,18 +125,31 @@ CREATE TABLE "product_images" (
 	"is_primary" boolean DEFAULT false NOT NULL
 );
 --> statement-breakpoint
+CREATE TABLE "product_variant_images" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"variant_id" uuid,
+	"image_url" text NOT NULL,
+	"is_primary" boolean DEFAULT false,
+	"created_at" timestamp DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
 CREATE TABLE "product_variants" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"product_id" uuid NOT NULL,
 	"sku" text NOT NULL,
 	"price" numeric(10, 2) NOT NULL,
 	"sale_price" numeric(10, 2),
+	"cost_price" numeric(10, 2),
 	"color_id" uuid NOT NULL,
 	"size_id" uuid NOT NULL,
 	"in_stock" integer DEFAULT 0 NOT NULL,
+	"low_stock_threshold" integer DEFAULT 10 NOT NULL,
+	"max_quantity_per_order" integer DEFAULT 10 NOT NULL,
+	"is_active" boolean DEFAULT true,
 	"weight" real,
 	"dimensions" jsonb,
 	"created_at" timestamp DEFAULT now() NOT NULL,
+	"is_deleted" boolean DEFAULT false,
 	CONSTRAINT "product_variants_sku_unique" UNIQUE("sku")
 );
 --> statement-breakpoint
@@ -243,6 +256,7 @@ ALTER TABLE "products" ADD CONSTRAINT "products_gender_id_genders_id_fk" FOREIGN
 ALTER TABLE "products" ADD CONSTRAINT "products_brand_id_brands_id_fk" FOREIGN KEY ("brand_id") REFERENCES "public"."brands"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "product_images" ADD CONSTRAINT "product_images_product_id_products_id_fk" FOREIGN KEY ("product_id") REFERENCES "public"."products"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "product_images" ADD CONSTRAINT "product_images_variant_id_product_variants_id_fk" FOREIGN KEY ("variant_id") REFERENCES "public"."product_variants"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "product_variant_images" ADD CONSTRAINT "product_variant_images_variant_id_product_variants_id_fk" FOREIGN KEY ("variant_id") REFERENCES "public"."product_variants"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "product_variants" ADD CONSTRAINT "product_variants_product_id_products_id_fk" FOREIGN KEY ("product_id") REFERENCES "public"."products"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "product_variants" ADD CONSTRAINT "product_variants_color_id_colors_id_fk" FOREIGN KEY ("color_id") REFERENCES "public"."colors"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "product_variants" ADD CONSTRAINT "product_variants_size_id_sizes_id_fk" FOREIGN KEY ("size_id") REFERENCES "public"."sizes"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
