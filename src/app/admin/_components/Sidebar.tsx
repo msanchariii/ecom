@@ -62,6 +62,16 @@ const navItems = [
     icon: User,
   },
   {
+    name: "Colors",
+    href: "/admin/colors",
+    icon: Palette,
+  },
+  {
+    name: "Sizes",
+    href: "/admin/sizes",
+    icon: Tag,
+  },
+  {
     name: "Settings",
     href: "/admin/settings",
     icon: Settings,
@@ -72,10 +82,10 @@ export default function Sidebar() {
   const pathname = usePathname();
 
   return (
-    <aside className="w-64 bg-gray-900 text-white min-h-screen fixed left-0 top-0">
-      <div className="p-6">
-        <h1 className="text-2xl font-bold mb-8">Admin Panel</h1>
-        <nav className="space-y-2">
+    <aside className="w-56 bg-gray-900 text-white min-h-screen fixed left-0 top-0">
+      <div className="p-4">
+        <h1 className="text-xl font-bold mb-6">Admin Panel</h1>
+        <nav className="space-y-1">
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = pathname === item.href;
@@ -84,13 +94,13 @@ export default function Sidebar() {
               <Link
                 key={item.href}
                 href={item.href}
-                className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
+                className={`flex items-center gap-2 px-3 py-1 rounded-lg transition-colors ${
                   isActive
                     ? "bg-blue-600 text-white"
                     : "text-gray-300 hover:bg-gray-800 hover:text-white"
                 }`}
               >
-                <Icon className="w-5 h-5" />
+                <Icon className="w-4 h-4" />
                 <span>{item.name}</span>
               </Link>
             );
