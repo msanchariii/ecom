@@ -10,6 +10,11 @@ import { addProduct, updateProduct } from "../_actions/products";
 import { getCategories } from "../_actions/categories";
 import { getGenders } from "../_actions/filters";
 import { getBrands } from "../_actions/brands";
+import {
+  getCollections,
+  getCollectionsForProduct,
+  updateProductCollections,
+} from "../_actions/collection";
 
 interface ProductFormProps {
   product?: {
@@ -32,6 +37,10 @@ const ProductForm = ({ product }: ProductFormProps) => {
     [],
   );
   const [brands, setBrands] = useState<Array<{ id: string; name: string }>>([]);
+  const [collections, setCollections] = useState<
+    Array<{ id: string; name: string }>
+  >([]);
+  const [selectedCollections, setSelectedCollections] = useState<string[]>([]);
 
   const {
     register,
@@ -53,14 +62,17 @@ const ProductForm = ({ product }: ProductFormProps) => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [categoriesData, gendersData, brandsData] = await Promise.all([
-          getCategories(),
-          getGenders(),
-          getBrands(),
-        ]);
+        const [categoriesData, gendersData, brandsData, collectionsData] =
+          await Promise.all([
+            getCategories(),
+            getGenders(),
+            getBrands(),
+            getCollections(),
+          ]);
         setCategories(categoriesData);
         setGenders(gendersData);
         setBrands(brandsData);
+        setCollections(collectionsData);
       } catch (error) {
         console.error("Failed to fetch data:", error);
         toast.error("Failed to load form data");
@@ -68,6 +80,21 @@ const ProductForm = ({ product }: ProductFormProps) => {
     };
     fetchData();
   }, []);
+
+  // Load collections for product if editing
+  useEffect(() => {
+    const loadProductCollections = async () => {
+      if (product?.id) {
+        try {
+          const productCollections = await getCollectionsForProduct(product.id);
+          setSelectedCollections(productCollections.map((c) => c.id));
+        } catch (error) {
+          console.error("Failed to load product collections:", error);
+        }
+      }
+    };
+    loadProductCollections();
+  }, [product?.id]);
 
   const onSubmit = async (data: InsertProduct) => {
     try {
@@ -79,13 +106,20 @@ const ProductForm = ({ product }: ProductFormProps) => {
         brandId: data.brandId || null,
       };
 
+      let productId: string;
       if (product) {
-        await updateProduct(product.id, payload);
+        const result = await updateProduct(product.id, payload);
+        productId = result.id;
         toast.success("Product updated successfully");
       } else {
-        await addProduct(payload);
+        const result = await addProduct(payload);
+        productId = result.id;
         toast.success("Product added successfully");
       }
+
+      // Update product collections
+      await updateProductCollections(productId, selectedCollections);
+
       window.location.href = "/admin/products";
     } catch (error) {
       console.error("Failed to save product:", error);
@@ -194,6 +228,52 @@ const ProductForm = ({ product }: ProductFormProps) => {
             <p className="text-sm text-red-500">{errors.brandId.message}</p>
           )}
         </div>
+      </div>
+
+      {/* Collections */}
+      <div className="space-y-2">
+        <label className="block text-sm font-medium">Collections</label>
+        <p className="text-xs text-gray-500 mb-2">
+          Select collections for this product
+        </p>
+        <div className="border border-gray-300 rounded-md p-4 max-h-60 overflow-y-auto space-y-2">
+          {collections.length === 0 ? (
+            <p className="text-sm text-gray-500">No collections available</p>
+          ) : (
+            collections.map((collection) => (
+              <label
+                key={collection.id}
+                className="flex items-center space-x-2 cursor-pointer hover:bg-gray-50 p-2 rounded"
+              >
+                <input
+                  type="checkbox"
+                  checked={selectedCollections.includes(collection.id)}
+                  onChange={(e) => {
+                    if (e.target.checked) {
+                      setSelectedCollections([
+                        ...selectedCollections,
+                        collection.id,
+                      ]);
+                    } else {
+                      setSelectedCollections(
+                        selectedCollections.filter(
+                          (id) => id !== collection.id,
+                        ),
+                      );
+                    }
+                  }}
+                  className="h-4 w-4 text-primary border-gray-300 rounded focus:ring-primary"
+                />
+                <span className="text-sm">{collection.name}</span>
+              </label>
+            ))
+          )}
+        </div>
+        {selectedCollections.length > 0 && (
+          <p className="text-xs text-gray-500 mt-2">
+            {selectedCollections.length} collection(s) selected
+          </p>
+        )}
       </div>
 
       <div className="space-y-2">

@@ -18,11 +18,6 @@ import {
 } from "../_actions/variants";
 import VariantImageUpload from "@/components/VariantImageUpload";
 import { uploadFileToS3 } from "@/lib/upload/client";
-import {
-  getCollections,
-  getCollectionsForProduct,
-  updateProductCollections,
-} from "../_actions/collection";
 
 interface ProductVariantFormProps {
   variant?: {
@@ -54,10 +49,6 @@ const ProductVariantForm = ({ variant }: ProductVariantFormProps) => {
     Array<{ id: string; name: string; hexCode: string }>
   >([]);
   const [sizes, setSizes] = useState<Array<{ id: string; name: string }>>([]);
-  const [collections, setCollections] = useState<
-    Array<{ id: string; name: string }>
-  >([]);
-  const [selectedCollections, setSelectedCollections] = useState<string[]>([]);
   const [variantImages, setVariantImages] = useState<
     Array<{ file: File | null; url: string | null; isPrimary: boolean }>
   >([]);
@@ -110,17 +101,14 @@ const ProductVariantForm = ({ variant }: ProductVariantFormProps) => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [productsData, colorsData, sizesData, collectionsData] =
-          await Promise.all([
-            getProducts(),
-            getColors(),
-            getSizes(),
-            getCollections(),
-          ]);
+        const [productsData, colorsData, sizesData] = await Promise.all([
+          getProducts(),
+          getColors(),
+          getSizes(),
+        ]);
         setProducts(productsData.map((p) => ({ id: p.id, name: p.name })));
         setColors(colorsData);
         setSizes(sizesData);
-        setCollections(collectionsData);
       } catch (error) {
         console.error("Failed to fetch data:", error);
         toast.error("Failed to load form data");
@@ -128,24 +116,6 @@ const ProductVariantForm = ({ variant }: ProductVariantFormProps) => {
     };
     fetchData();
   }, []);
-
-  // Load collections for product if editing
-  const productId = watch("productId");
-  useEffect(() => {
-    const loadProductCollections = async () => {
-      if (productId) {
-        try {
-          const productCollections = await getCollectionsForProduct(productId);
-          setSelectedCollections(productCollections.map((c) => c.id));
-        } catch (error) {
-          console.error("Failed to load product collections:", error);
-        }
-      } else {
-        setSelectedCollections([]);
-      }
-    };
-    loadProductCollections();
-  }, [productId]);
 
   const handleImagesChange = (
     images: Array<{
@@ -226,12 +196,6 @@ const ProductVariantForm = ({ variant }: ProductVariantFormProps) => {
       } else if (variant && currentImages.length > 0) {
         // If editing and no new images, keep the existing images
         // (already in database, no action needed)
-      }
-
-      // Update product collections
-      if (data.productId) {
-        toast.loading("Updating collections...", { id: loadingToast });
-        await updateProductCollections(data.productId, selectedCollections);
       }
 
       toast.success(
@@ -492,52 +456,6 @@ const ProductVariantForm = ({ variant }: ProductVariantFormProps) => {
             {...register("dimensions.height", { valueAsNumber: true })}
           />
         </div>
-      </div>
-
-      {/* Collections */}
-      <div className="space-y-2">
-        <label className="block text-sm font-medium">Collections</label>
-        <p className="text-xs text-gray-500 mb-2">
-          Select collections for this product variant
-        </p>
-        <div className="border border-gray-300 rounded-md p-4 max-h-60 overflow-y-auto space-y-2">
-          {collections.length === 0 ? (
-            <p className="text-sm text-gray-500">No collections available</p>
-          ) : (
-            collections.map((collection) => (
-              <label
-                key={collection.id}
-                className="flex items-center space-x-2 cursor-pointer hover:bg-gray-50 p-2 rounded"
-              >
-                <input
-                  type="checkbox"
-                  checked={selectedCollections.includes(collection.id)}
-                  onChange={(e) => {
-                    if (e.target.checked) {
-                      setSelectedCollections([
-                        ...selectedCollections,
-                        collection.id,
-                      ]);
-                    } else {
-                      setSelectedCollections(
-                        selectedCollections.filter(
-                          (id) => id !== collection.id,
-                        ),
-                      );
-                    }
-                  }}
-                  className="h-4 w-4 text-primary border-gray-300 rounded focus:ring-primary"
-                />
-                <span className="text-sm">{collection.name}</span>
-              </label>
-            ))
-          )}
-        </div>
-        {selectedCollections.length > 0 && (
-          <p className="text-xs text-gray-500 mt-2">
-            {selectedCollections.length} collection(s) selected
-          </p>
-        )}
       </div>
 
       {/* Image Upload */}
