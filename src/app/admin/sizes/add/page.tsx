@@ -1,4 +1,3 @@
-import React from "react";
 import SizeForm from "../../_forms/Size";
 
 const AddSizePage = () => {

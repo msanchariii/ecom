@@ -20,7 +20,7 @@ export const insertBrandSchema = z.object({
   logoUrl: z.url().optional().nullable(),
 });
 export const selectBrandSchema = insertBrandSchema.extend({
-  id: z.string().uuid(),
+  id: z.uuid(),
 });
 export type InsertBrand = z.infer<typeof insertBrandSchema>;
 export type SelectBrand = z.infer<typeof selectBrandSchema>;

@@ -1,6 +1,11 @@
 "use server";
 import { db } from "@/lib/db";
-import { collections, InsertCollection } from "@/lib/db/schema";
+import {
+  collections,
+  InsertCollection,
+  productCollections,
+  InsertProductCollection,
+} from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 
@@ -43,6 +48,24 @@ export const addCollection = async (data: InsertCollection) => {
   return rows[0];
 };
 
+// Get collections for a product
+export const getCollectionsForProduct = async (productId: string) => {
+  const rows = await db
+    .select({
+      id: collections.id,
+      name: collections.name,
+      slug: collections.slug,
+    })
+    .from(collections)
+    .innerJoin(
+      productCollections,
+      eq(collections.id, productCollections.collectionId),
+    )
+    .where(eq(productCollections.productId, productId));
+
+  return rows;
+};
+
 // Edit Collection
 export const updateCollection = async (
   id: string,
@@ -52,6 +75,7 @@ export const updateCollection = async (
     .update(collections)
     .set({
       name: data.name,
+      slug: data.slug,
     })
     .where(eq(collections.id, id))
     .returning();
@@ -67,4 +91,51 @@ export const deleteCollection = async (id: string) => {
     .returning();
   revalidatePath("/admin/collections");
   return rows[0];
+};
+
+// Product Collections Management
+export const addProductCollections = async (
+  productId: string,
+  collectionIds: string[],
+) => {
+  if (collectionIds.length === 0) return [];
+
+  const rows = await db
+    .insert(productCollections)
+    .values(
+      collectionIds.map((collectionId) => ({
+        id: crypto.randomUUID(),
+        productId,
+        collectionId,
+      })),
+    )
+    .returning();
+
+  revalidatePath("/admin/variants");
+  revalidatePath("/admin/products");
+  return rows;
+};
+
+export const deleteProductCollections = async (productId: string) => {
+  await db
+    .delete(productCollections)
+    .where(eq(productCollections.productId, productId));
+
+  revalidatePath("/admin/variants");
+  revalidatePath("/admin/products");
+};
+
+export const updateProductCollections = async (
+  productId: string,
+  collectionIds: string[],
+) => {
+  // Delete existing associations
+  await deleteProductCollections(productId);
+
+  // Add new associations
+  if (collectionIds.length > 0) {
+    return await addProductCollections(productId, collectionIds);
+  }
+
+  return [];
 };

@@ -75,13 +75,13 @@ export const productVariantsRelations = relations(
 );
 
 export const insertVariantSchema = z.object({
-  productId: z.string().uuid(),
+  productId: z.uuid(),
   sku: z.string().min(1),
   price: z.string(),
   salePrice: z.string().optional().nullable(),
   costPrice: z.string().optional().nullable(),
-  colorId: z.string().uuid(),
-  sizeId: z.string().uuid(),
+  colorId: z.uuid(),
+  sizeId: z.uuid(),
   inStock: z.number().int().nonnegative().optional(),
   lowStockThreshold: z.number().int().nonnegative().optional(),
   maxQuantityPerOrder: z.number().int().positive().optional(),
@@ -98,7 +98,7 @@ export const insertVariantSchema = z.object({
   createdAt: z.date().optional(),
 });
 export const selectVariantSchema = insertVariantSchema.extend({
-  id: z.string().uuid(),
+  id: z.uuid(),
 });
 export type InsertVariant = z.infer<typeof insertVariantSchema>;
 export type SelectVariant = z.infer<typeof selectVariantSchema>;

@@ -30,10 +30,14 @@ export const categoriesRelations = relations(categories, ({ many, one }) => ({
 export const insertCategorySchema = z.object({
   name: z.string().min(1),
   slug: z.string().min(1),
-  parentId: z.uuid().optional().refine((value)=>value===""?null:value).nullable(),
+  parentId: z
+    .uuid()
+    .optional()
+    .refine((value) => (value === "" ? null : value))
+    .nullable(),
 });
 export const selectCategorySchema = insertCategorySchema.extend({
-  id: z.string().uuid(),
+  id: z.uuid(),
 });
 export type InsertCategory = z.infer<typeof insertCategorySchema>;
 export type SelectCategory = z.infer<typeof selectCategorySchema>;

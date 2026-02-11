@@ -1,5 +1,3 @@
-import { notFound } from "next/navigation";
-import React from "react";
 import { getGenderById } from "../../_actions/filters";
 import GenderForm from "../../_forms/Gender";
 
