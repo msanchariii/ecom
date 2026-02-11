@@ -1,10 +1,10 @@
 import { Card } from "@/components";
-import { getLatestProducts } from "@/lib/actions/product";
+import { getLatestVariants } from "@/lib/actions/product";
 import { getCurrentUser } from "@/lib/auth/actions";
 
 const Home = async () => {
   const user = await getCurrentUser();
-  const products = await getLatestProducts(4);
+  const variants = await getLatestVariants(4);
 
   console.log("USER:", user);
 
@@ -15,23 +15,21 @@ const Home = async () => {
           Latest shoes
         </h2>
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {products.map((p) => {
+          {variants.map((v) => {
+            const displayPrice = v.salePrice ?? v.price;
             const price =
-              p.minPrice !== null &&
-              p.maxPrice !== null &&
-              p.minPrice !== p.maxPrice
-                ? `$${p.minPrice.toFixed(2)} - $${p.maxPrice.toFixed(2)}`
-                : p.minPrice !== null
-                  ? `$${p.minPrice.toFixed(2)}`
-                  : undefined;
+              displayPrice !== null ? `$${displayPrice.toFixed(2)}` : undefined;
+            const subtitle = v.subtitle
+              ? `${v.subtitle} • ${v.colorName || ""} • ${v.sizeName || ""}`
+              : `${v.colorName || ""} • ${v.sizeName || ""}`;
             return (
               <Card
-                key={p.id}
-                title={p.name}
-                subtitle={p.subtitle ?? undefined}
-                imageSrc={p.imageUrl ?? "/shoes/shoe-1.jpg"}
+                key={v.id}
+                title={v.productName}
+                subtitle={subtitle}
+                imageSrc={v.imageUrl ?? "/shoes/shoe-1.jpg"}
                 price={price}
-                href={`/products/${p.id}`}
+                href={`/products/${v.id}`}
               />
             );
           })}

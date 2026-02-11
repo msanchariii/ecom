@@ -10,6 +10,7 @@ import { Heart, ShoppingBag, Star } from "lucide-react";
 import ColorSwatches from "@/components/ColorSwatches";
 import {
   getProduct,
+  getProductByVariantId,
   getProductReviews,
   getRecommendedProducts,
   type Review,
@@ -124,7 +125,8 @@ export default async function ProductDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const data = await getProduct(id);
+  // ID here is actually a variant ID from the listing page
+  const data = await getProductByVariantId(id);
 
   if (!data) {
     return (
@@ -149,20 +151,16 @@ export default async function ProductDetailPage({
   const galleryVariants: GalleryVariant[] = variants.map((v) => {
     const imgs = images
       .filter((img) => img.variantId === v.id)
-      .map((img) => img.url);
-
-    const fallback = images
-      .filter((img) => img.variantId === null)
       .sort((a, b) => {
         if (a.isPrimary && !b.isPrimary) return -1;
         if (!a.isPrimary && b.isPrimary) return 1;
-        return (a.sortOrder ?? 0) - (b.sortOrder ?? 0);
+        return 0;
       })
       .map((img) => img.url);
 
     return {
       color: v.color?.name || "Default",
-      images: imgs.length ? imgs : fallback,
+      images: imgs,
     };
   });
 

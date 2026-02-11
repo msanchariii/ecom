@@ -2,7 +2,7 @@ import { Card } from "@/components";
 import Filters from "@/components/Filters";
 import Sort from "@/components/Sort";
 import { parseFilterParams } from "@/lib/utils/query";
-import { getAllProducts } from "@/lib/actions/product";
+import { getAllProductVariantsForListing } from "@/lib/actions/product";
 
 type SearchParams = Record<string, string | string[] | undefined>;
 
@@ -14,7 +14,8 @@ export default async function ProductsPage({
   const sp = await searchParams;
 
   const parsed = parseFilterParams(sp);
-  const { products, totalCount } = await getAllProducts(parsed);
+  const { variants, totalCount } =
+    await getAllProductVariantsForListing(parsed);
 
   const activeBadges: string[] = [];
   (sp.gender
@@ -67,7 +68,7 @@ export default async function ProductsPage({
       <section className="grid grid-cols-1 gap-6 md:grid-cols-[240px_1fr]">
         <Filters />
         <div>
-          {products.length === 0 ? (
+          {variants.length === 0 ? (
             <div className="rounded-lg border border-light-300 p-8 text-center">
               <p className="text-body text-dark-700">
                 No products match your filters.
@@ -75,23 +76,23 @@ export default async function ProductsPage({
             </div>
           ) : (
             <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 pb-6">
-              {products.map((p) => {
+              {variants.map((v) => {
+                const displayPrice = v.salePrice ?? v.price;
                 const price =
-                  p.minPrice !== null &&
-                  p.maxPrice !== null &&
-                  p.minPrice !== p.maxPrice
-                    ? `$${p.minPrice.toFixed(2)} - $${p.maxPrice.toFixed(2)}`
-                    : p.minPrice !== null
-                      ? p.minPrice
-                      : undefined;
+                  displayPrice !== null
+                    ? `$${displayPrice.toFixed(2)}`
+                    : undefined;
+                const subtitle = v.subtitle
+                  ? `${v.subtitle} • ${v.colorName || ""} • ${v.sizeName || ""}`
+                  : `${v.colorName || ""} • ${v.sizeName || ""}`;
                 return (
                   <Card
-                    key={p.id}
-                    title={p.name}
-                    subtitle={p.subtitle ?? undefined}
-                    imageSrc={p.imageUrl ?? "/shoes/shoe-1.jpg"}
+                    key={v.id}
+                    title={v.productName}
+                    subtitle={subtitle}
+                    imageSrc={v.imageUrl ?? "/shoes/shoe-1.jpg"}
                     price={price}
-                    href={`/products/${p.id}`}
+                    href={`/products/${v.id}`}
                   />
                 );
               })}
