@@ -1,3 +1,4 @@
+import { Toaster } from "@/components/ui/sonner";
 import Sidebar from "./_components/Sidebar";
 
 export default function AdminLayout({
@@ -9,6 +10,7 @@ export default function AdminLayout({
     <div className="flex min-h-screen bg-gray-50" id="admin">
       <Sidebar />
       <main className="ml-64 flex-1 p-8">{children}</main>
+      <Toaster />
     </div>
   );
 }

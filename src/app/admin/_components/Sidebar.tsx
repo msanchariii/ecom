@@ -22,9 +22,14 @@ const navItems = [
     icon: LayoutDashboard,
   },
   {
-    name: "Products",
+    name: "Product Listings",
     href: "/admin/products",
     icon: Package,
+  },
+  {
+    name: "Variants / SKUs",
+    href: "/admin/variants",
+    icon: Palette,
   },
   {
     name: "Orders",
@@ -46,11 +51,7 @@ const navItems = [
     href: "/admin/brands",
     icon: Tag,
   },
-  {
-    name: "Variants",
-    href: "/admin/variants",
-    icon: Palette,
-  },
+
   {
     name: "Analytics",
     href: "/admin/analytics",

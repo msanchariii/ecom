@@ -1,5 +1,5 @@
 import React from "react";
-import { getGenders } from "../_actions/gender";
+import { getGenders } from "../_actions/filters";
 import {
   Table,
   TableBody,

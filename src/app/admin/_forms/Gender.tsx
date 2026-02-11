@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import { insertGenderSchema, SelectGender } from "@/lib/db/schema";
-import { addGender, updateGender } from "../_actions/gender";
+import { addGender, updateGender } from "../_actions/filters";
 import { useRouter } from "next/navigation";
 
 export default function GenderForm({ gender }: { gender?: SelectGender }) {

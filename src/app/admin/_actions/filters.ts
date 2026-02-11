@@ -6,6 +6,7 @@ import { sizes, InsertSize } from "@/lib/db/schema/filters/sizes";
 import { eq } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import { revalidatePath } from "next/cache";
+import { genders, InsertGender, insertGenderSchema } from "@/lib/db/schema";
 
 // ============= COLORS =============
 
@@ -58,6 +59,7 @@ export const updateColor = async (id: string, data: Partial<InsertColor>) => {
 export const deleteColor = async (id: string) => {
   const rows = await db.delete(colors).where(eq(colors.id, id)).returning();
   console.log("Deleted Color:", rows);
+  revalidatePath("/admin/colors");
   return rows[0];
 };
 
@@ -90,6 +92,7 @@ export const addSize = async (data: InsertSize) => {
     })
     .returning();
   console.log("Added Size:", rows);
+  revalidatePath("/admin/sizes");
   return rows[0];
 };
 
@@ -104,11 +107,64 @@ export const updateSize = async (id: string, data: Partial<InsertSize>) => {
     .where(eq(sizes.id, id))
     .returning();
   console.log("Updated Size:", rows);
+  revalidatePath("/admin/sizes");
   return rows[0];
 };
 
 export const deleteSize = async (id: string) => {
   const rows = await db.delete(sizes).where(eq(sizes.id, id)).returning();
   console.log("Deleted Size:", rows);
+  revalidatePath("/admin/sizes");
   return rows[0];
+};
+
+export const getGenders = async () => {
+  const rows = await db.select().from(genders);
+  const results = rows.map((row) => ({
+    id: row.id,
+    label: row.label,
+    slug: row.slug,
+  }));
+  return results;
+};
+
+export const getGenderById = async (id: string) => {
+  const row = await db
+    .select()
+    .from(genders)
+    .where(eq(genders.id, id))
+    .limit(1);
+  if (row.length === 0) {
+    return null;
+  }
+  const gender = row[0];
+  return {
+    id: gender.id,
+    label: gender.label,
+    slug: gender.slug,
+  };
+};
+
+export const addGender = async (data: InsertGender) => {
+  try {
+    const validated = insertGenderSchema.parse(data);
+    await db.insert(genders).values(validated);
+    revalidatePath("/admin/gender");
+    return { success: true };
+  } catch (error) {
+    console.error("Failed to add gender:", error);
+    throw error;
+  }
+};
+
+export const updateGender = async (id: string, data: InsertGender) => {
+  try {
+    const validated = insertGenderSchema.parse(data);
+    await db.update(genders).set(validated).where(eq(genders.id, id));
+    revalidatePath("/admin/gender");
+    return { success: true };
+  } catch (error) {
+    console.error("Failed to update gender:", error);
+    throw error;
+  }
 };
