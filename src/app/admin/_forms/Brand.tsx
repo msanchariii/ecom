@@ -1,19 +1,40 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { insertBrandSchema, SelectBrand } from "@/lib/db/schema";
 import { addBrand, updateBrand } from "../_actions/brands";
 import { useRouter } from "next/navigation";
 import ImageUpload from "@/components/ImageUpload";
 import { replaceFileInS3, deleteFileFromS3 } from "@/lib/upload/client";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { toast } from "sonner";
+import { z } from "zod";
+
+type BrandFormValues = z.infer<typeof insertBrandSchema>;
 
 export default function BrandForm({ brand }: { brand?: SelectBrand }) {
   const router = useRouter();
-  const [name, setName] = useState(brand?.name || "");
-  const [slug, setSlug] = useState(brand?.slug || "");
-  const [error, setError] = useState<string | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [imageRemoved, setImageRemoved] = useState(false);
+
+  const {
+    register,
+    handleSubmit,
+    watch,
+    setValue,
+    formState: { errors, isSubmitting },
+  } = useForm<BrandFormValues>({
+    resolver: zodResolver(insertBrandSchema),
+    defaultValues: {
+      name: brand?.name || "",
+      slug: brand?.slug || "",
+      logoUrl: brand?.logoUrl || null,
+    },
+  });
+
+  const name = watch("name");
 
   // Auto-generate slug from name
   useEffect(() => {
@@ -23,9 +44,9 @@ export default function BrandForm({ brand }: { brand?: SelectBrand }) {
         .trim()
         .replace(/[^a-z0-9]+/g, "-")
         .replace(/^-|-$/g, "");
-      setSlug(generatedSlug);
+      setValue("slug", generatedSlug);
     }
-  }, [name, brand]);
+  }, [name, brand, setValue]);
 
   const handleFileSelect = (file: File | null) => {
     setSelectedFile(file);
@@ -37,11 +58,7 @@ export default function BrandForm({ brand }: { brand?: SelectBrand }) {
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(null);
-    setIsSubmitting(true);
-
+  const onSubmit = async (data: BrandFormValues) => {
     try {
       let finalLogoUrl = brand?.logoUrl || null;
 
@@ -55,81 +72,75 @@ export default function BrandForm({ brand }: { brand?: SelectBrand }) {
         finalLogoUrl = await replaceFileInS3(brand?.logoUrl, selectedFile);
       }
 
-      const data = insertBrandSchema.parse({
-        name,
-        slug,
+      const formattedData = {
+        ...data,
+        name: data.name.trim(),
+        slug: data.slug.trim(),
         logoUrl: finalLogoUrl,
-      });
+      };
 
       if (brand) {
-        await updateBrand(brand.id, data);
+        await updateBrand(brand.id, formattedData);
+        toast.success("Brand updated successfully");
       } else {
-        await addBrand(data);
+        await addBrand(formattedData);
+        toast.success("Brand added successfully");
       }
 
       router.push("/admin/brands");
       router.refresh();
     } catch (err) {
+      console.error("Failed to save brand:", err);
       if (err instanceof Error) {
-        setError(err.message);
+        toast.error(err.message);
+      } else {
+        toast.error(brand ? "Failed to update brand" : "Failed to add brand");
       }
-    } finally {
-      setIsSubmitting(false);
     }
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
       <div className="bg-white rounded-lg shadow p-6">
         <h2 className="text-2xl font-bold text-gray-900 mb-6">
           {brand ? "Edit Brand" : "Add Brand"}
         </h2>
 
-        {error && (
-          <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
-            <p className="text-red-800 text-sm">{error}</p>
-          </div>
-        )}
-
         <div className="space-y-4">
-          <div>
-            <label
-              htmlFor="name"
-              className="block text-sm font-medium text-gray-700 mb-1"
-            >
+          <div className="space-y-2">
+            <label htmlFor="name" className="block text-sm font-medium">
               Brand Name <span className="text-red-500">*</span>
             </label>
-            <input
+            <Input
               id="name"
               type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
               placeholder="e.g., Nike, Adidas, Puma"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors"
-              required
+              {...register("name")}
+              className={errors.name ? "border-red-500" : ""}
             />
-            <p className="mt-1 text-xs text-gray-500">
+            {errors.name && (
+              <p className="text-sm text-red-500">{errors.name.message}</p>
+            )}
+            <p className="text-xs text-gray-500">
               The official name of the brand
             </p>
           </div>
 
-          <div>
-            <label
-              htmlFor="slug"
-              className="block text-sm font-medium text-gray-700 mb-1"
-            >
+          <div className="space-y-2">
+            <label htmlFor="slug" className="block text-sm font-medium">
               Slug <span className="text-red-500">*</span>
             </label>
-            <input
+            <Input
               id="slug"
               type="text"
-              value={slug}
-              onChange={(e) => setSlug(e.target.value)}
               placeholder="e.g., nike, adidas, puma"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors"
-              required
+              {...register("slug")}
+              className={errors.slug ? "border-red-500" : ""}
             />
-            <p className="mt-1 text-xs text-gray-500">
+            {errors.slug && (
+              <p className="text-sm text-red-500">{errors.slug.message}</p>
+            )}
+            <p className="text-xs text-gray-500">
               URL-friendly identifier (auto-generated from name)
             </p>
           </div>
@@ -144,11 +155,7 @@ export default function BrandForm({ brand }: { brand?: SelectBrand }) {
         </div>
 
         <div className="flex items-center gap-3 mt-6 pt-6 border-t border-gray-200">
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
-          >
+          <Button type="submit" disabled={isSubmitting}>
             {isSubmitting
               ? selectedFile
                 ? "Uploading & Saving..."
@@ -156,14 +163,15 @@ export default function BrandForm({ brand }: { brand?: SelectBrand }) {
               : brand
                 ? "Update Brand"
                 : "Add Brand"}
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
+            variant="outline"
             onClick={() => router.back()}
-            className="px-6 py-2 border border-gray-300 hover:bg-gray-50 text-gray-700 font-medium rounded-lg transition-colors"
+            disabled={isSubmitting}
           >
             Cancel
-          </button>
+          </Button>
         </div>
       </div>
     </form>
