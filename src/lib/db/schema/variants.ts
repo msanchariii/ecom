@@ -43,16 +43,6 @@ export const productVariants = pgTable("product_variants", {
   isDeleted: boolean("is_deleted").default(false), // soft delete flag
 });
 
-// export const productVariantImages = pgTable("product_variant_images", {
-//   id: uuid("id").primaryKey().defaultRandom(),
-//   variantId: uuid("variant_id").references(() => productVariants.id, {
-//     onDelete: "cascade",
-//   }), // !should not be null, but for existing records we can set default value
-//   imageUrl: text("image_url").notNull(),
-//   isPrimary: boolean("is_primary").default(false),
-//   createdAt: timestamp("created_at").defaultNow().notNull(),
-// });
-
 export const productVariantsRelations = relations(
   productVariants,
   ({ one, many }) => ({

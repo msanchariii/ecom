@@ -1,18 +1,8 @@
-/**
- * Products Listing Page
- *
- * This page displays products, one card per product.
- * Each card shows the product with its default variant's image.
- *
- * When clicked, links to: /products/[defaultVariantId]
- * where the detail page shows all available sizes and colors.
- */
-
 import { Card } from "@/components";
 import Filters from "@/components/Filters";
 import Sort from "@/components/Sort";
 import { parseFilterParams } from "@/lib/utils/query";
-import { getAllProducts } from "@/lib/actions/product";
+import { getAllProducts, testQuery, testQuery2 } from "@/lib/actions/product";
 
 type SearchParams = Record<string, string | string[] | undefined>;
 
@@ -22,12 +12,16 @@ export default async function ProductsPage({
   searchParams: Promise<SearchParams>;
 }) {
   const sp = await searchParams;
+  const testData = await testQuery();
+  const testData2 = await testQuery2("8f2341de-817c-433d-8e93-64f506c6ce9c");
+  console.log("Test:", testData[0]);
+  console.log("Test 2:", testData2?.variants[0].sizes);
 
   const parsed = parseFilterParams(sp);
   const { products, totalCount } = await getAllProducts(parsed);
 
-  console.log("Products page - Total products:", totalCount);
-  console.log("Products page - First product:", products[0]);
+  // console.log("Products page - Total products:", totalCount);
+  // console.log("Products page - First product:", products[0]);
 
   const activeBadges: string[] = [];
   (sp.gender
@@ -56,7 +50,7 @@ export default async function ProductsPage({
       activeBadges.push(label);
     },
   );
-  console.log("Active products:", products);
+  // console.log("Active products:", products);
   return (
     <main className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-12">
       <header className="flex items-center justify-between py-6">

@@ -1108,3 +1108,152 @@ export async function getRecommendedProducts(
   }
   return out;
 }
+
+// Get products with their color variants
+export const testQuery = async () => {
+  // Get basic product info
+  const productsList = await db
+    .select({
+      id: products.id,
+      name: products.name,
+      categoryId: products.categoryId,
+      brandId: products.brandId,
+      basePrice: sql<string>`MIN(${productVariants.price})`,
+      salePrice: sql<string>`MIN(${productVariants.salePrice})`,
+      hasStock: sql<boolean>`BOOL_OR(${productVariants.inStock} > 0)`,
+    })
+    .from(products)
+    .leftJoin(productVariants, eq(products.id, productVariants.productId))
+    .where(
+      and(
+        eq(products.isPublished, true),
+        eq(productVariants.isActive, true),
+        eq(productVariants.isDeleted, false),
+      ),
+    )
+    .groupBy(products.id)
+    .limit(20);
+
+  const productIds = productsList.map((p) => p.id);
+
+  // Get colors for these products
+  const colorsData = await db
+    .selectDistinct({
+      productId: productVariants.productId,
+      colorId: colors.id,
+      colorName: colors.name,
+      colorHex: colors.hexCode,
+    })
+    .from(productVariants)
+    .innerJoin(colors, eq(productVariants.colorId, colors.id))
+    .where(
+      and(
+        inArray(productVariants.productId, productIds),
+        eq(productVariants.isActive, true),
+        eq(productVariants.isDeleted, false),
+      ),
+    );
+
+  // Get primary images
+  const imagesData = await db
+    .select({
+      productId: productImages.productId,
+      colorId: productImages.colorId,
+      url: productImages.url,
+      sortOrder: productImages.sortOrder,
+    })
+    .from(productImages)
+    .where(
+      and(
+        inArray(productImages.productId, productIds),
+        eq(productImages.isPrimary, true),
+      ),
+    )
+    .orderBy(productImages.sortOrder);
+
+  // Combine the data
+  const result = productsList.map((product) => ({
+    ...product,
+    colors: colorsData
+      .filter((c) => c.productId === product.id)
+      .map((c) => ({
+        id: c.colorId,
+        name: c.colorName,
+        hex: c.colorHex,
+      })),
+    images: imagesData
+      .filter((img) => img.productId === product.id)
+      .map((img) => ({
+        colorId: img.colorId,
+        url: img.url,
+      })),
+  }));
+  console.log("Result: ", result);
+  return result;
+};
+
+export const testQuery2 = async (productId: string) => {
+  try {
+    // Get full product details with all variants
+    const productDetails = await db.query.products.findFirst({
+      where: eq(products.id, productId),
+      with: {
+        category: true,
+        brand: true,
+        gender: true,
+        images: {
+          orderBy: [asc(productImages.sortOrder)],
+        },
+      },
+    });
+
+    // Get all variants grouped by color
+    const variants = await db
+      .select({
+        colorId: colors.id,
+        colorName: colors.name,
+        colorHex: colors.hexCode,
+        sizes: sql<
+          Array<{
+            id: string;
+            name: string;
+            price: string;
+            salePrice: string | null;
+            inStock: number;
+            variantId: string;
+            sku: string;
+          }>
+        >`
+      JSON_AGG(
+        JSON_BUILD_OBJECT(
+          'id', ${sizes.id},
+          'name', ${sizes.name},
+          'price', ${productVariants.price},
+          'salePrice', ${productVariants.salePrice},
+          'inStock', ${productVariants.inStock},
+          'variantId', ${productVariants.id},
+          'sku', ${productVariants.sku}
+        ) ORDER BY ${sizes.sortOrder}
+      )
+    `.as("sizes"),
+      })
+      .from(productVariants)
+      .innerJoin(colors, eq(productVariants.colorId, colors.id))
+      .innerJoin(sizes, eq(productVariants.sizeId, sizes.id))
+      .where(
+        and(
+          eq(productVariants.productId, productId),
+          eq(productVariants.isActive, true),
+          eq(productVariants.isDeleted, false),
+        ),
+      )
+      .groupBy(colors.id, colors.name, colors.hexCode);
+
+    return {
+      product: productDetails,
+      variants,
+    };
+  } catch (error) {
+    console.error("Error in testQuery2:", error);
+  }
+};

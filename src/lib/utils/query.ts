@@ -1,6 +1,14 @@
 import qs from "query-string";
 
-type QueryValue = string | number | boolean | null | undefined | string[] | number[] | boolean[];
+type QueryValue =
+  | string
+  | number
+  | boolean
+  | null
+  | undefined
+  | string[]
+  | number[]
+  | boolean[];
 type QueryObject = Record<string, QueryValue>;
 
 export function parseQuery(search: string): QueryObject {
@@ -9,15 +17,27 @@ export function parseQuery(search: string): QueryObject {
 }
 
 export function stringifyQuery(query: QueryObject): string {
-  return qs.stringify(query, { skipNull: true, skipEmptyString: true, arrayFormat: "bracket" });
+  return qs.stringify(query, {
+    skipNull: true,
+    skipEmptyString: true,
+    arrayFormat: "bracket",
+  });
 }
 
-export function withUpdatedParams(pathname: string, currentSearch: string, updates: QueryObject): string {
+export function withUpdatedParams(
+  pathname: string,
+  currentSearch: string,
+  updates: QueryObject,
+): string {
   const current = parseQuery(currentSearch);
   const next: QueryObject = { ...current };
 
   Object.entries(updates).forEach(([key, value]) => {
-    if (value === undefined || value === null || (Array.isArray(value) && value.length === 0)) {
+    if (
+      value === undefined ||
+      value === null ||
+      (Array.isArray(value) && value.length === 0)
+    ) {
       delete next[key];
     } else {
       next[key] = value as QueryValue;
@@ -32,17 +52,25 @@ export function toggleArrayParam(
   pathname: string,
   currentSearch: string,
   key: string,
-  value: string
+  value: string,
 ): string {
   const current = parseQuery(currentSearch);
-  const arr = new Set<string>(Array.isArray(current[key]) ? (current[key] as string[]) : current[key] ? [String(current[key])] : []);
+  const arr = new Set<string>(
+    Array.isArray(current[key])
+      ? (current[key] as string[])
+      : current[key]
+        ? [String(current[key])]
+        : [],
+  );
   if (arr.has(value)) {
     arr.delete(value);
   } else {
     arr.add(value);
   }
   const nextValues = Array.from(arr);
-  const updates: QueryObject = { [key]: nextValues.length ? nextValues : undefined };
+  const updates: QueryObject = {
+    [key]: nextValues.length ? nextValues : undefined,
+  };
   return withUpdatedParams(pathname, currentSearch, updates);
 }
 
@@ -50,12 +78,18 @@ export function setParam(
   pathname: string,
   currentSearch: string,
   key: string,
-  value: string | number | null | undefined
+  value: string | number | null | undefined,
 ): string {
-  return withUpdatedParams(pathname, currentSearch, { [key]: value === null || value === undefined ? undefined : String(value) });
+  return withUpdatedParams(pathname, currentSearch, {
+    [key]: value === null || value === undefined ? undefined : String(value),
+  });
 }
 
-export function removeParams(pathname: string, currentSearch: string, keys: string[]): string {
+export function removeParams(
+  pathname: string,
+  currentSearch: string,
+  keys: string[],
+): string {
   const current = parseQuery(currentSearch);
   keys.forEach((k) => delete current[k]);
   const search = stringifyQuery(current);
@@ -70,7 +104,10 @@ export function getArrayParam(search: string, key: string): string[] {
   return [String(v)];
 }
 
-export function getStringParam(search: string, key: string): string | undefined {
+export function getStringParam(
+  search: string,
+  key: string,
+): string | undefined {
   const q = parseQuery(search);
   const v = q[key];
   if (v === undefined) return undefined;
@@ -93,12 +130,22 @@ export type NormalizedProductFilters = {
   limit: number;
 };
 
-export function parseFilterParams(sp: Record<string, string | string[] | undefined>): NormalizedProductFilters {
+export function parseFilterParams(
+  sp: Record<string, string | string[] | undefined>,
+): NormalizedProductFilters {
   const getArr = (k: string) => {
     const v1 = sp[k];
     const v2 = sp[`${k}[]`];
-    const arr1 = Array.isArray(v1) ? v1.map(String) : v1 === undefined ? [] : [String(v1)];
-    const arr2 = Array.isArray(v2) ? (v2 as string[]).map(String) : v2 === undefined ? [] : [String(v2 as string)];
+    const arr1 = Array.isArray(v1)
+      ? v1.map(String)
+      : v1 === undefined
+        ? []
+        : [String(v1)];
+    const arr2 = Array.isArray(v2)
+      ? (v2 as string[]).map(String)
+      : v2 === undefined
+        ? []
+        : [String(v2 as string)];
     return [...arr1, ...arr2];
   };
   const getStr = (k: string) => {
@@ -116,24 +163,28 @@ export function parseFilterParams(sp: Record<string, string | string[] | undefin
   const categorySlugs = getArr("category").map((s) => s.toLowerCase());
 
   const priceRangesStr = getArr("price");
-  const priceRanges: Array<[number | undefined, number | undefined]> = priceRangesStr
-    .map((r) => {
-      const [minStr, maxStr] = String(r).split("-");
-      const min = minStr ? Number(minStr) : undefined;
-      const max = maxStr ? Number(maxStr) : undefined;
-      return [Number.isNaN(min as number) ? undefined : min, Number.isNaN(max as number) ? undefined : max] as [
-        number | undefined,
-        number | undefined
-      ];
-    })
-    .filter(() => true);
+  const priceRanges: Array<[number | undefined, number | undefined]> =
+    priceRangesStr
+      .map((r) => {
+        const [minStr, maxStr] = String(r).split("-");
+        const min = minStr ? Number(minStr) : undefined;
+        const max = maxStr ? Number(maxStr) : undefined;
+        return [
+          Number.isNaN(min as number) ? undefined : min,
+          Number.isNaN(max as number) ? undefined : max,
+        ] as [number | undefined, number | undefined];
+      })
+      .filter(() => true);
 
   const priceMin = getStr("priceMin") ? Number(getStr("priceMin")) : undefined;
   const priceMax = getStr("priceMax") ? Number(getStr("priceMax")) : undefined;
 
   const sortParam = getStr("sort");
   const sort: NormalizedProductFilters["sort"] =
-    sortParam === "price_asc" || sortParam === "price_desc" || sortParam === "newest" || sortParam === "featured"
+    sortParam === "price_asc" ||
+    sortParam === "price_desc" ||
+    sortParam === "newest" ||
+    sortParam === "featured"
       ? sortParam
       : "newest";
 
@@ -148,8 +199,10 @@ export function parseFilterParams(sp: Record<string, string | string[] | undefin
     colorSlugs,
     brandSlugs,
     categorySlugs,
-    priceMin: priceMin !== undefined && !Number.isNaN(priceMin) ? priceMin : undefined,
-    priceMax: priceMax !== undefined && !Number.isNaN(priceMax) ? priceMax : undefined,
+    priceMin:
+      priceMin !== undefined && !Number.isNaN(priceMin) ? priceMin : undefined,
+    priceMax:
+      priceMax !== undefined && !Number.isNaN(priceMax) ? priceMax : undefined,
     priceRanges,
     sort,
     page,
