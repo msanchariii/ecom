@@ -1,16 +1,21 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { insertSizeSchema, SelectSize } from "@/lib/db/schema/filters/sizes";
 import { addSize, updateSize } from "../_actions/filters";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
+import { z } from "zod";
 
 interface SizeFormProps {
   size?: SelectSize;
 }
+
+type SizeFormValues = z.infer<typeof insertSizeSchema>;
 
 /**
  * Size Add/Edit Form Component
@@ -23,10 +28,23 @@ interface SizeFormProps {
  */
 export default function SizeForm({ size }: SizeFormProps) {
   const router = useRouter();
-  const [name, setName] = useState(size?.name || "");
-  const [slug, setSlug] = useState(size?.slug || "");
-  const [sortOrder, setSortOrder] = useState(size?.sortOrder || 0);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const {
+    register,
+    handleSubmit,
+    watch,
+    setValue,
+    formState: { errors, isSubmitting },
+  } = useForm<SizeFormValues>({
+    resolver: zodResolver(insertSizeSchema),
+    defaultValues: {
+      name: size?.name || "",
+      slug: size?.slug || "",
+      sortOrder: size?.sortOrder || 0,
+    },
+  });
+
+  const name = watch("name");
 
   // Common size presets
   const sizePresets = [
@@ -57,32 +75,29 @@ export default function SizeForm({ size }: SizeFormProps) {
         .trim()
         .replace(/[^a-z0-9]+/g, "-")
         .replace(/^-|-$/g, "");
-      setSlug(generatedSlug);
+      setValue("slug", generatedSlug);
     }
-  }, [name, size]);
+  }, [name, size, setValue]);
 
   const handlePresetClick = (preset: { name: string; sortOrder: number }) => {
-    setName(preset.name);
-    setSortOrder(preset.sortOrder);
+    setValue("name", preset.name);
+    setValue("sortOrder", preset.sortOrder);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsSubmitting(true);
-
+  const onSubmit = async (data: SizeFormValues) => {
     try {
-      // Validate data with Zod schema
-      const data = insertSizeSchema.parse({
-        name: name.trim(),
-        slug: slug.trim(),
-        sortOrder: Number(sortOrder),
-      });
+      const formattedData = {
+        ...data,
+        name: data.name.trim(),
+        slug: data.slug.trim(),
+        sortOrder: Number(data.sortOrder),
+      };
 
       if (size) {
-        await updateSize(size.id, data);
+        await updateSize(size.id, formattedData);
         toast.success("Size updated successfully");
       } else {
-        await addSize(data);
+        await addSize(formattedData);
         toast.success("Size added successfully");
       }
 
@@ -95,13 +110,11 @@ export default function SizeForm({ size }: SizeFormProps) {
       } else {
         toast.error(size ? "Failed to update size" : "Failed to add size");
       }
-    } finally {
-      setIsSubmitting(false);
     }
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
       <div className="bg-white rounded-lg shadow-sm border p-6">
         <h2 className="text-2xl font-bold mb-6">
           {size ? "Edit Size" : "Add Size"}
@@ -165,11 +178,13 @@ export default function SizeForm({ size }: SizeFormProps) {
             <Input
               id="name"
               type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
               placeholder="e.g., M, L, XL, 42, 10"
-              required
+              {...register("name")}
+              className={errors.name ? "border-red-500" : ""}
             />
+            {errors.name && (
+              <p className="text-sm text-red-500">{errors.name.message}</p>
+            )}
             <p className="text-xs text-muted-foreground">
               The display name for this size
             </p>
@@ -183,11 +198,13 @@ export default function SizeForm({ size }: SizeFormProps) {
             <Input
               id="slug"
               type="text"
-              value={slug}
-              onChange={(e) => setSlug(e.target.value)}
               placeholder="e.g., m, l, xl, 42, 10"
-              required
+              {...register("slug")}
+              className={errors.slug ? "border-red-500" : ""}
             />
+            {errors.slug && (
+              <p className="text-sm text-red-500">{errors.slug.message}</p>
+            )}
             <p className="text-xs text-muted-foreground">
               URL-friendly identifier (auto-generated from name)
             </p>
@@ -201,11 +218,13 @@ export default function SizeForm({ size }: SizeFormProps) {
             <Input
               id="sortOrder"
               type="number"
-              value={sortOrder}
-              onChange={(e) => setSortOrder(Number(e.target.value))}
               placeholder="e.g., 1, 2, 3"
-              required
+              {...register("sortOrder", { valueAsNumber: true })}
+              className={errors.sortOrder ? "border-red-500" : ""}
             />
+            {errors.sortOrder && (
+              <p className="text-sm text-red-500">{errors.sortOrder.message}</p>
+            )}
             <p className="text-xs text-muted-foreground">
               Lower numbers appear first. Example: XS=1, S=2, M=3, L=4, XL=5
             </p>
@@ -218,17 +237,19 @@ export default function SizeForm({ size }: SizeFormProps) {
             </p>
             <div className="flex items-center gap-3 p-3 bg-white rounded border">
               <div className="w-12 h-12 rounded-md border-2 border-gray-300 bg-white flex items-center justify-center">
-                <span className="font-bold text-gray-700">{name || "?"}</span>
+                <span className="font-bold text-gray-700">
+                  {watch("name") || "?"}
+                </span>
               </div>
               <div>
                 <p className="font-medium text-gray-900">
-                  Size: {name || "Size Name"}
+                  Size: {watch("name") || "Size Name"}
                 </p>
                 <p className="text-sm text-gray-500">
-                  Slug: {slug || "size-slug"}
+                  Slug: {watch("slug") || "size-slug"}
                 </p>
                 <p className="text-xs text-gray-400 mt-1">
-                  Display Order: #{sortOrder || 0}
+                  Display Order: #{watch("sortOrder") || 0}
                 </p>
               </div>
             </div>

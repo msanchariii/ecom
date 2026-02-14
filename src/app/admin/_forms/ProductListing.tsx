@@ -1,6 +1,9 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import { toast } from "sonner";
 import { Upload, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -31,18 +34,38 @@ type ImageSlot = {
   isPrimary: boolean;
 };
 
+const productListingSchema = z.object({
+  productId: z.string().min(1, "Product is required"),
+  colorId: z.string().min(1, "Color is required"),
+});
+
+type ProductListingFormValues = z.infer<typeof productListingSchema>;
+
 export const ProductListingForm = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [colors, setColors] = useState<Color[]>([]);
-  const [selectedProductId, setSelectedProductId] = useState("");
-  const [selectedColorId, setSelectedColorId] = useState("");
   const [images, setImages] = useState<ImageSlot[]>([
     { file: null, url: null, isPrimary: true },
     { file: null, url: null, isPrimary: false },
     { file: null, url: null, isPrimary: false },
     { file: null, url: null, isPrimary: false },
   ]);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const {
+    register,
+    handleSubmit,
+    watch,
+    formState: { errors, isSubmitting },
+  } = useForm<ProductListingFormValues>({
+    resolver: zodResolver(productListingSchema),
+    defaultValues: {
+      productId: "",
+      colorId: "",
+    },
+  });
+
+  const selectedProductId = watch("productId");
+  const selectedColorId = watch("colorId");
 
   // Fetch products and colors
   useEffect(() => {
@@ -138,31 +161,12 @@ export const ProductListingForm = () => {
     setImages(newImages);
   };
 
-  const validateForm = (): boolean => {
-    if (!selectedProductId) {
-      toast.error("Please select a product");
-      return false;
-    }
-    if (!selectedColorId) {
-      toast.error("Please select a color");
-      return false;
-    }
+  const onSubmit = async (data: ProductListingFormValues) => {
     const hasFirstImage = images[0]?.file !== null || images[0]?.url !== null;
     if (!hasFirstImage) {
       toast.error("First image is required (Primary image)");
-      return false;
-    }
-    return true;
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!validateForm()) {
       return;
     }
-
-    setIsSubmitting(true);
 
     try {
       const loadingToast = toast.loading("Uploading images...");
@@ -188,10 +192,10 @@ export const ProductListingForm = () => {
         ) as Array<{ url: string; isPrimary: boolean; sortOrder: number }>;
 
         // Delete old images for this product+color
-        await deleteProductImages(selectedProductId, selectedColorId);
+        await deleteProductImages(data.productId, data.colorId);
 
         // Save new images to database
-        await addProductImages(selectedProductId, selectedColorId, validImages);
+        await addProductImages(data.productId, data.colorId, validImages);
 
         toast.success("Images uploaded successfully", { id: loadingToast });
 
@@ -201,12 +205,10 @@ export const ProductListingForm = () => {
         }, 500);
       } else {
         toast.error("No images to upload");
-        setIsSubmitting(false);
       }
     } catch (error) {
       console.error("Failed to upload images:", error);
       toast.error("Failed to upload images");
-      setIsSubmitting(false);
     }
   };
 
@@ -214,7 +216,7 @@ export const ProductListingForm = () => {
   const selectedColor = colors.find((c) => c.id === selectedColorId);
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
       {/* Product Selection */}
       <div className="bg-white rounded-lg border p-6 space-y-4">
         <h3 className="text-lg font-semibold">Select Product & Color</h3>
@@ -226,10 +228,8 @@ export const ProductListingForm = () => {
             </label>
             <select
               id="productId"
-              value={selectedProductId}
-              onChange={(e) => setSelectedProductId(e.target.value)}
+              {...register("productId")}
               className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-              required
             >
               <option value="">Select a product</option>
               {products.map((product) => (
@@ -238,6 +238,9 @@ export const ProductListingForm = () => {
                 </option>
               ))}
             </select>
+            {errors.productId && (
+              <p className="text-sm text-red-500">{errors.productId.message}</p>
+            )}
           </div>
 
           <div className="space-y-2">
@@ -247,10 +250,8 @@ export const ProductListingForm = () => {
             <div className="flex gap-2">
               <select
                 id="colorId"
-                value={selectedColorId}
-                onChange={(e) => setSelectedColorId(e.target.value)}
+                {...register("colorId")}
                 className="flex-1 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                required
               >
                 <option value="">Select a color</option>
                 {colors.map((color) => (
@@ -270,6 +271,9 @@ export const ProductListingForm = () => {
                 />
               )}
             </div>
+            {errors.colorId && (
+              <p className="text-sm text-red-500">{errors.colorId.message}</p>
+            )}
           </div>
         </div>
 

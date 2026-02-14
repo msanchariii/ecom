@@ -1,16 +1,37 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useEffect } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { insertGenderSchema, SelectGender } from "@/lib/db/schema";
 import { addGender, updateGender } from "../_actions/filters";
 import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { toast } from "sonner";
+import { z } from "zod";
+
+type GenderFormValues = z.infer<typeof insertGenderSchema>;
 
 export default function GenderForm({ gender }: { gender?: SelectGender }) {
   const router = useRouter();
-  const [label, setLabel] = useState(gender?.label || "");
-  const [slug, setSlug] = useState(gender?.slug || "");
-  const [error, setError] = useState<string | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const {
+    register,
+    handleSubmit,
+    watch,
+    setValue,
+    formState: { errors, isSubmitting },
+  } = useForm<GenderFormValues>({
+    resolver: zodResolver(insertGenderSchema),
+    defaultValues: {
+      label: gender?.label || "",
+      slug: gender?.slug || "",
+    },
+  });
+
+  const label = watch("label");
+
+  // Auto-generate slug from label
   useEffect(() => {
     if (!gender && label) {
       const generatedSlug = label
@@ -18,111 +39,103 @@ export default function GenderForm({ gender }: { gender?: SelectGender }) {
         .trim()
         .replace(/[^a-z0-9]+/g, "-")
         .replace(/^-|-$/g, "");
-      setSlug(generatedSlug);
+      setValue("slug", generatedSlug);
     }
-  }, [label, gender]);
+  }, [label, gender, setValue]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(null);
-    setIsSubmitting(true);
-
+  const onSubmit = async (data: GenderFormValues) => {
     try {
-      const data = insertGenderSchema.parse({ label, slug });
+      const formattedData = {
+        ...data,
+        label: data.label.trim(),
+        slug: data.slug.trim(),
+      };
 
       if (gender) {
-        await updateGender(gender.id, data);
+        await updateGender(gender.id, formattedData);
+        toast.success("Gender updated successfully");
       } else {
-        await addGender(data);
+        await addGender(formattedData);
+        toast.success("Gender added successfully");
       }
 
       router.push("/admin/gender");
       router.refresh();
     } catch (err) {
+      console.error("Failed to save gender:", err);
       if (err instanceof Error) {
-        setError(err.message);
+        toast.error(err.message);
+      } else {
+        toast.error(
+          gender ? "Failed to update gender" : "Failed to add gender",
+        );
       }
-    } finally {
-      setIsSubmitting(false);
     }
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
       <div className="bg-white rounded-lg shadow p-6">
         <h2 className="text-2xl font-bold text-gray-900 mb-6">
           {gender ? "Edit Gender" : "Add Gender"}
         </h2>
 
-        {error && (
-          <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
-            <p className="text-red-800 text-sm">{error}</p>
-          </div>
-        )}
-
         <div className="space-y-4">
-          <div>
-            <label
-              htmlFor="label"
-              className="block text-sm font-medium text-gray-700 mb-1"
-            >
+          <div className="space-y-2">
+            <label htmlFor="label" className="block text-sm font-medium">
               Label <span className="text-red-500">*</span>
             </label>
-            <input
+            <Input
               id="label"
               type="text"
-              value={label}
-              onChange={(e) => setLabel(e.target.value)}
               placeholder="e.g., Men, Women, Unisex"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors"
-              required
+              {...register("label")}
+              className={errors.label ? "border-red-500" : ""}
             />
-            <p className="mt-1 text-xs text-gray-500">
+            {errors.label && (
+              <p className="text-sm text-red-500">{errors.label.message}</p>
+            )}
+            <p className="text-xs text-gray-500">
               The display name for this gender category
             </p>
           </div>
 
-          <div>
-            <label
-              htmlFor="slug"
-              className="block text-sm font-medium text-gray-700 mb-1"
-            >
+          <div className="space-y-2">
+            <label htmlFor="slug" className="block text-sm font-medium">
               Slug <span className="text-red-500">*</span>
             </label>
-            <input
+            <Input
               id="slug"
               type="text"
-              value={slug}
-              onChange={(e) => setSlug(e.target.value)}
               placeholder="e.g., men, women, unisex"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors"
-              required
+              {...register("slug")}
+              className={errors.slug ? "border-red-500" : ""}
             />
-            <p className="mt-1 text-xs text-gray-500">
+            {errors.slug && (
+              <p className="text-sm text-red-500">{errors.slug.message}</p>
+            )}
+            <p className="text-xs text-gray-500">
               URL-friendly identifier (auto-generated from label)
             </p>
           </div>
         </div>
 
         <div className="flex items-center gap-3 mt-6 pt-6 border-t border-gray-200">
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
-          >
+          <Button type="submit" disabled={isSubmitting}>
             {isSubmitting
               ? "Saving..."
               : gender
                 ? "Update Gender"
                 : "Add Gender"}
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
+            variant="outline"
             onClick={() => router.back()}
-            className="px-6 py-2 border border-gray-300 hover:bg-gray-50 text-gray-700 font-medium rounded-lg transition-colors"
+            disabled={isSubmitting}
           >
             Cancel
-          </button>
+          </Button>
         </div>
       </div>
     </form>
