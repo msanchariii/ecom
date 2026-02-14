@@ -1192,68 +1192,172 @@ export const testQuery = async () => {
   return result;
 };
 
-export const testQuery2 = async (productId: string) => {
+// export const testQuery2 = async (productId: string) => {
+//   try {
+//     // Get full product details with all variants
+//     const productDetails = await db.query.products.findFirst({
+//       where: eq(products.id, productId),
+//       with: {
+//         category: true,
+//         brand: true,
+//         gender: true,
+//         images: {
+//           orderBy: [asc(productImages.sortOrder)],
+//         },
+//       },
+//     });
+
+//     // Get all variants grouped by color
+//     const variants = await db
+//       .select({
+//         colorId: colors.id,
+//         colorName: colors.name,
+//         colorHex: colors.hexCode,
+//         sizes: sql<
+//           Array<{
+//             id: string;
+//             name: string;
+//             price: string;
+//             salePrice: string | null;
+//             inStock: number;
+//             variantId: string;
+//             sku: string;
+//           }>
+//         >`
+//       JSON_AGG(
+//         JSON_BUILD_OBJECT(
+//           'id', ${sizes.id},
+//           'name', ${sizes.name},
+//           'price', ${productVariants.price},
+//           'salePrice', ${productVariants.salePrice},
+//           'inStock', ${productVariants.inStock},
+//           'variantId', ${productVariants.id},
+//           'sku', ${productVariants.sku}
+//         ) ORDER BY ${sizes.sortOrder}
+//       )
+//     `.as("sizes"),
+//       })
+//       .from(productVariants)
+//       .innerJoin(colors, eq(productVariants.colorId, colors.id))
+//       .innerJoin(sizes, eq(productVariants.sizeId, sizes.id))
+//       .where(
+//         and(
+//           eq(productVariants.productId, productId),
+//           eq(productVariants.isActive, true),
+//           eq(productVariants.isDeleted, false),
+//         ),
+//       )
+//       .groupBy(colors.id, colors.name, colors.hexCode);
+
+//     return {
+//       product: productDetails,
+//       variants,
+//     };
+//   } catch (error) {
+//     console.error("Error in testQuery2:", error);
+//   }
+// };
+
+
+export const getProductDetails = async (productId: string, colorSlug?: string) => {
   try {
-    // Get full product details with all variants
+    // Get full product details
     const productDetails = await db.query.products.findFirst({
       where: eq(products.id, productId),
       with: {
         category: true,
         brand: true,
         gender: true,
-        images: {
-          orderBy: [asc(productImages.sortOrder)],
-        },
       },
     });
 
-    // Get all variants grouped by color
-    const variants = await db
-      .select({
-        colorId: colors.id,
-        colorName: colors.name,
-        colorHex: colors.hexCode,
-        sizes: sql<
-          Array<{
-            id: string;
-            name: string;
-            price: string;
-            salePrice: string | null;
-            inStock: number;
-            variantId: string;
-            sku: string;
-          }>
-        >`
-      JSON_AGG(
-        JSON_BUILD_OBJECT(
-          'id', ${sizes.id},
-          'name', ${sizes.name},
-          'price', ${productVariants.price},
-          'salePrice', ${productVariants.salePrice},
-          'inStock', ${productVariants.inStock},
-          'variantId', ${productVariants.id},
-          'sku', ${productVariants.sku}
-        ) ORDER BY ${sizes.sortOrder}
-      )
-    `.as("sizes"),
+    if (!productDetails) {
+      return null;
+    }
+
+    // Get all available colors for this product
+    const availableColors = await db
+      .selectDistinct({
+        id: colors.id,
+        name: colors.name,
+        slug: colors.slug,
+        hexCode: colors.hexCode,
       })
       .from(productVariants)
       .innerJoin(colors, eq(productVariants.colorId, colors.id))
-      .innerJoin(sizes, eq(productVariants.sizeId, sizes.id))
       .where(
         and(
           eq(productVariants.productId, productId),
           eq(productVariants.isActive, true),
-          eq(productVariants.isDeleted, false),
-        ),
+          eq(productVariants.isDeleted, false)
+        )
+      );
+
+    // Determine which color to show
+    let selectedColor;
+    if (colorSlug) {
+      selectedColor = availableColors.find(c => c.slug === colorSlug);
+    }
+    // If no color specified or invalid color, use first available
+    if (!selectedColor && availableColors.length > 0) {
+      selectedColor = availableColors[0];
+    }
+
+    if (!selectedColor) {
+      return {
+        product: productDetails,
+        availableColors: [],
+        selectedColor: null,
+        sizes: [],
+        images: [],
+      };
+    }
+
+    // Get sizes for the selected color
+    const sizesData = await db
+      .select({
+        id: sizes.id,
+        name: sizes.name,
+        slug: sizes.slug,
+        sortOrder: sizes.sortOrder,
+        price: productVariants.price,
+        salePrice: productVariants.salePrice,
+        inStock: productVariants.inStock,
+        variantId: productVariants.id,
+        sku: productVariants.sku,
+        maxQuantityPerOrder: productVariants.maxQuantityPerOrder,
+        lowStockThreshold: productVariants.lowStockThreshold,
+      })
+      .from(productVariants)
+      .innerJoin(sizes, eq(productVariants.sizeId, sizes.id))
+      .where(
+        and(
+          eq(productVariants.productId, productId),
+          eq(productVariants.colorId, selectedColor.id),
+          eq(productVariants.isActive, true),
+          eq(productVariants.isDeleted, false)
+        )
       )
-      .groupBy(colors.id, colors.name, colors.hexCode);
+      .orderBy(asc(sizes.sortOrder));
+
+    // Get images for the selected color
+    const images = await db.query.productImages.findMany({
+      where: and(
+        eq(productImages.productId, productId),
+        eq(productImages.colorId, selectedColor.id)
+      ),
+      orderBy: [asc(productImages.sortOrder)],
+    });
 
     return {
       product: productDetails,
-      variants,
+      availableColors,
+      selectedColor,
+      sizes: sizesData,
+      images,
     };
   } catch (error) {
-    console.error("Error in testQuery2:", error);
+    console.error("Error in getProductDetails:", error);
+    throw error;
   }
 };

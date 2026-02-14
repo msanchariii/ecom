@@ -2,7 +2,7 @@ import { Card } from "@/components";
 import Filters from "@/components/Filters";
 import Sort from "@/components/Sort";
 import { parseFilterParams } from "@/lib/utils/query";
-import { getAllProducts, testQuery, testQuery2 } from "@/lib/actions/product";
+import { getAllProducts, testQuery } from "@/lib/actions/product";
 
 type SearchParams = Record<string, string | string[] | undefined>;
 
@@ -13,9 +13,7 @@ export default async function ProductsPage({
 }) {
   const sp = await searchParams;
   const testData = await testQuery();
-  const testData2 = await testQuery2("8f2341de-817c-433d-8e93-64f506c6ce9c");
-  console.log("Test:", testData[0]);
-  console.log("Test 2:", testData2?.variants[0].sizes);
+  
 
   const parsed = parseFilterParams(sp);
   const { products, totalCount } = await getAllProducts(parsed);
