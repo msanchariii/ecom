@@ -26,6 +26,7 @@ type ProductActionsProps = {
   variants: Variant[];
   defaultVariantId?: string | null;
   primaryImage?: string;
+  variantImages?: Record<string, string>; // Map of variant ID to image URL
 };
 
 export default function ProductActions({
@@ -34,6 +35,7 @@ export default function ProductActions({
   variants,
   defaultVariantId,
   primaryImage,
+  variantImages = {},
 }: ProductActionsProps) {
   const { addItem } = useCartStore();
   const { getSelected } = useVariantStore();
@@ -56,12 +58,15 @@ export default function ProductActions({
       ? Number(selectedVariant.salePrice)
       : Number(selectedVariant.price);
 
+    // Get the image for the selected variant, fallback to primaryImage
+    const variantImage = variantImages[selectedVariant.id] || primaryImage;
+
     addItem({
       id: selectedVariant.id,
       productId,
       name: productName,
       price,
-      image: primaryImage,
+      image: variantImage,
       color: selectedVariant.color?.name,
       size: selectedSize,
     });

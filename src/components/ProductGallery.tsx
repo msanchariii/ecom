@@ -6,6 +6,7 @@ import { ChevronLeft, ChevronRight, ImageOff } from "lucide-react";
 import { useVariantStore } from "@/store/variant";
 
 type Variant = {
+  id: string; // variant ID for URL navigation
   color: string;
   images: string[];
 };
@@ -27,6 +28,7 @@ export default function ProductGallery({
   initialVariantIndex = 0,
   className = "",
 }: ProductGalleryProps) {
+  const setSelected = useVariantStore((s) => s.setSelected);
   const validVariants = useMemo(
     () =>
       variants.filter(
@@ -44,6 +46,11 @@ export default function ProductGallery({
   const images = validVariants[variantIndex]?.images?.filter(isValidSrc) ?? [];
   const [activeIndex, setActiveIndex] = useState(0);
   const mainRef = useRef<HTMLDivElement>(null);
+
+  // Sync the store with the initial variant from the URL
+  useEffect(() => {
+    setSelected(productId, initialVariantIndex);
+  }, [productId, initialVariantIndex, setSelected]);
 
   useEffect(() => {
     setActiveIndex(0);
@@ -77,7 +84,7 @@ export default function ProductGallery({
             key={`${src}-${i}`}
             aria-label={`Thumbnail ${i + 1}`}
             onClick={() => setActiveIndex(i)}
-            className={`relative h-16 w-16 flex-shrink-0 overflow-hidden rounded-lg ring-1 ring-light-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-dark-500 ${i === activeIndex ? "ring-dark-500" : ""}`}
+            className={`relative h-16 w-16 shrink-0 overflow-hidden rounded-lg ring-1 ring-light-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-dark-500 ${i === activeIndex ? "ring-dark-500" : ""}`}
           >
             <Image
               src={src}

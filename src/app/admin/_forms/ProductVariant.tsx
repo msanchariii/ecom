@@ -7,17 +7,13 @@ import { useForm } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { getProducts } from "../_actions/products";
-import { getColors, getSizes } from "../_actions/filters";
 import {
-  addVariant,
-  updateVariant,
-  addVariantImages,
-  getVariantImages,
-  deleteVariantImages,
-} from "../_actions/variants";
-import VariantImageUpload from "@/components/VariantImageUpload";
-import { uploadFileToS3 } from "@/lib/upload/client";
+  getProducts,
+  getProductImages,
+  checkImagesExistForColor,
+} from "../_actions/products";
+import { getColors, getSizes } from "../_actions/filters";
+import { addVariant, updateVariant } from "../_actions/variants";
 
 interface ProductVariantFormProps {
   variant?: {
@@ -49,13 +45,10 @@ const ProductVariantForm = ({ variant }: ProductVariantFormProps) => {
     Array<{ id: string; name: string; hexCode: string }>
   >([]);
   const [sizes, setSizes] = useState<Array<{ id: string; name: string }>>([]);
-  const [variantImages, setVariantImages] = useState<
-    Array<{ file: File | null; url: string | null; isPrimary: boolean }>
-  >([]);
-  const [currentImages, setCurrentImages] = useState<
-    Array<{ imageUrl: string; isPrimary: boolean }>
-  >([]);
-  const [imageError, setImageError] = useState<string | null>(null);
+  const [imagesExistForColor, setImagesExistForColor] =
+    useState<boolean>(false);
+  const [selectedProductName, setSelectedProductName] = useState<string>("");
+  const [selectedColorName, setSelectedColorName] = useState<string>("");
 
   const {
     register,
@@ -77,25 +70,34 @@ const ProductVariantForm = ({ variant }: ProductVariantFormProps) => {
     },
   });
 
-  // Load existing images if editing
+  // Check if images exist for selected product + color
   useEffect(() => {
-    const loadImages = async () => {
-      if (variant?.id) {
+    const checkImages = async () => {
+      const productId = watch("productId");
+      const colorId = watch("colorId");
+
+      // Update selected product name
+      const selectedProduct = products.find((p) => p.id === productId);
+      setSelectedProductName(selectedProduct?.name || "");
+
+      // Update selected color name
+      const selectedColor = colors.find((c) => c.id === colorId);
+      setSelectedColorName(selectedColor?.name || "");
+
+      if (productId && colorId) {
         try {
-          const images = await getVariantImages(variant.id);
-          setCurrentImages(
-            images.map((img) => ({
-              imageUrl: img.imageUrl,
-              isPrimary: img.isPrimary || false,
-            })),
-          );
+          const exists = await checkImagesExistForColor(productId, colorId);
+          setImagesExistForColor(exists);
         } catch (error) {
-          console.error("Failed to load variant images:", error);
+          console.error("Failed to check product images:", error);
+          setImagesExistForColor(false);
         }
+      } else {
+        setImagesExistForColor(false);
       }
     };
-    loadImages();
-  }, [variant?.id]);
+    checkImages();
+  }, [watch("productId"), watch("colorId"), products, colors]);
 
   // Fetch dropdown data
   useEffect(() => {
@@ -117,33 +119,20 @@ const ProductVariantForm = ({ variant }: ProductVariantFormProps) => {
     fetchData();
   }, []);
 
-  const handleImagesChange = (
-    images: Array<{
-      file: File | null;
-      url: string | null;
-      isPrimary: boolean;
-    }>,
-  ) => {
-    setVariantImages(images);
-    setImageError(null);
-  };
-
   const onSubmit = async (data: InsertVariant) => {
     try {
-      // Validate at least one image
-      const hasAtLeastOneImage = variantImages.some(
-        (img) => img.file !== null || img.url !== null,
-      );
-
-      if (!hasAtLeastOneImage) {
-        setImageError("At least one image is required");
-        toast.error("Please upload at least one image");
+      // Validate that images exist for this product+color combination
+      if (!imagesExistForColor) {
+        toast.error(
+          `Please add images for ${selectedColorName || "this"} color in Product Listing first.`,
+          { duration: 5000 }
+        );
         return;
       }
 
       // Show loading toast
       const loadingToast = toast.loading(
-        variant ? "Updating variant..." : "Creating variant...",
+        variant ? "Updating variant..." : "Creating variant..."
       );
 
       // Prepare variant data
@@ -154,55 +143,18 @@ const ProductVariantForm = ({ variant }: ProductVariantFormProps) => {
         dimensions: data.dimensions || null,
       };
 
-      let variantId: string;
-
       // Create or update variant
       if (variant) {
-        const result = await updateVariant(variant.id, variantData);
-        variantId = result.id;
+        await updateVariant(variant.id, variantData);
       } else {
-        const result = await addVariant(variantData);
-        variantId = result.id;
-      }
-
-      // Upload new images if any
-      const imagesToUpload = variantImages.filter((img) => img.file !== null);
-
-      if (imagesToUpload.length > 0) {
-        toast.loading("Uploading images...", { id: loadingToast });
-
-        // Upload all images to S3
-        const uploadPromises = imagesToUpload.map(async (img) => {
-          if (!img.file) return null;
-          const publicUrl = await uploadFileToS3(img.file);
-          return {
-            imageUrl: publicUrl,
-            isPrimary: img.isPrimary,
-          };
-        });
-
-        const uploadedImages = await Promise.all(uploadPromises);
-        const validImages = uploadedImages.filter(
-          (img) => img !== null,
-        ) as Array<{ imageUrl: string; isPrimary: boolean }>;
-
-        // Delete old images if updating
-        if (variant) {
-          await deleteVariantImages(variantId);
-        }
-
-        // Save image references to database
-        await addVariantImages(variantId, validImages);
-      } else if (variant && currentImages.length > 0) {
-        // If editing and no new images, keep the existing images
-        // (already in database, no action needed)
+        await addVariant(variantData);
       }
 
       toast.success(
         variant
           ? "Variant updated successfully"
           : "Variant created successfully",
-        { id: loadingToast },
+        { id: loadingToast }
       );
 
       // Redirect to variants page
@@ -212,7 +164,7 @@ const ProductVariantForm = ({ variant }: ProductVariantFormProps) => {
     } catch (error) {
       console.error("Failed to save variant:", error);
       toast.error(
-        variant ? "Failed to update variant" : "Failed to create variant",
+        variant ? "Failed to update variant" : "Failed to create variant"
       );
     }
   };
@@ -458,16 +410,84 @@ const ProductVariantForm = ({ variant }: ProductVariantFormProps) => {
         </div>
       </div>
 
-      {/* Image Upload */}
-      <VariantImageUpload
-        currentImages={currentImages}
-        onImagesChange={handleImagesChange}
-        error={imageError}
-      />
+      {/* Image Validation Status */}
+      {watch("productId") && watch("colorId") && (
+        <div className="space-y-2">
+          {imagesExistForColor ? (
+            <div className="bg-green-50 border border-green-200 rounded-md p-4">
+              <div className="flex items-start gap-3">
+                <svg
+                  className="w-5 h-5 text-green-600 mt-0.5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                  />
+                </svg>
+                <div>
+                  <p className="text-sm font-medium text-green-800">
+                    Images Available
+                  </p>
+                  <p className="text-sm text-green-700 mt-1">
+                    Images exist for {selectedProductName} -{" "}
+                    {selectedColorName}. You can create this variant.
+                  </p>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="bg-red-50 border border-red-200 rounded-md p-4">
+              <div className="flex items-start gap-3">
+                <svg
+                  className="w-5 h-5 text-red-600 mt-0.5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                  />
+                </svg>
+                <div>
+                  <p className="text-sm font-medium text-red-800">
+                    Images Required
+                  </p>
+                  <p className="text-sm text-red-700 mt-1">
+                    No images found for {selectedProductName} -{" "}
+                    {selectedColorName}. Please add images in the Product
+                    Listing form before creating this variant.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      (window.location.href = "/admin/products/listing/new")
+                    }
+                    className="mt-2 text-sm font-medium text-red-800 underline hover:text-red-900"
+                  >
+                    Go to Product Listing Form
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Submit Button */}
       <div className="flex gap-4">
-        <Button type="submit" disabled={isSubmitting} className="flex-1">
+        <Button
+          type="submit"
+          disabled={isSubmitting || !imagesExistForColor}
+          className="flex-1"
+        >
           {isSubmitting
             ? variant
               ? "Updating..."

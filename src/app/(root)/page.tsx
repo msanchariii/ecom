@@ -1,3 +1,10 @@
+/**
+ * Home Page
+ *
+ * Displays latest product variants (SKUs).
+ * Each card links to /products/[variantId] for the detail page.
+ */
+
 import { Card } from "@/components";
 import { getLatestVariants } from "@/lib/actions/product";
 import { getCurrentUser } from "@/lib/auth/actions";
@@ -6,7 +13,9 @@ const Home = async () => {
   const user = await getCurrentUser();
   const variants = await getLatestVariants(4);
 
-  console.log("USER:", user);
+  console.log("Home page - USER:", user);
+  console.log("Home page - Latest variants count:", variants.length);
+  console.log("Home page - First variant:", variants[0]);
 
   return (
     <main className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-12">

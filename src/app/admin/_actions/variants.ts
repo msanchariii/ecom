@@ -3,13 +3,15 @@
 import { db } from "@/lib/db";
 import {
   productVariants,
-  productVariantImages,
   InsertVariant,
   products,
   productImages,
+  colors,
+  sizes,
 } from "@/lib/db/schema";
 import { and, eq } from "drizzle-orm";
 import { randomUUID } from "crypto";
+import { size } from "zod";
 
 export const getVariants = async () => {
   const rows = await db
@@ -18,15 +20,23 @@ export const getVariants = async () => {
       sku: productVariants.sku,
       price: productVariants.price,
       productName: products.name,
+      colorId: productVariants.colorId,
       imageUrl: productImages.url,
       stock: productVariants.inStock,
+      size: sizes.name,
     })
     .from(productVariants)
     .where(eq(productVariants.isDeleted, false))
     .leftJoin(products, eq(productVariants.productId, products.id))
-    .leftJoin(productImages, eq(productVariants.id, productImages.variantId));
-  // .where(eq(productImages.isPrimary, true));
-
+    .leftJoin(
+      productImages,
+      and(
+        eq(productVariants.productId, productImages.productId),
+        eq(productVariants.colorId, productImages.colorId),
+        eq(productImages.isPrimary, true),
+      ),
+    )
+    .leftJoin(sizes, eq(productVariants.sizeId, sizes.id));
   const result = rows.map((row) => ({
     id: row.variantId,
     sku: row.sku,
@@ -34,6 +44,7 @@ export const getVariants = async () => {
     productName: row.productName,
     imageUrl: row.imageUrl,
     inStock: row.stock,
+    size: row.size,
   }));
 
   return result;
@@ -53,11 +64,32 @@ export const getVariantById = async (id: string) => {
   return rows[0];
 };
 
+// Helper to sanitize variant data - remove empty strings for optional fields
+const sanitizeVariantData = (data: any) => {
+  const sanitized: any = {};
+
+  for (const [key, value] of Object.entries(data)) {
+    // Skip undefined values
+    if (value === undefined) continue;
+
+    // Convert empty strings to undefined for optional nullable fields
+    if (value === "" && ["salePrice", "costPrice", "weight"].includes(key)) {
+      continue; // Don't include this field, let DB handle it
+    }
+
+    // Keep all other values as-is
+    sanitized[key] = value;
+  }
+
+  return sanitized;
+};
+
 export const addVariant = async (data: InsertVariant) => {
+  const sanitizedData = sanitizeVariantData(data);
   const rows = await db
     .insert(productVariants)
     .values({
-      ...data,
+      ...sanitizedData,
       id: randomUUID(),
     })
     .returning();
@@ -69,9 +101,10 @@ export const updateVariant = async (
   id: string,
   data: Partial<InsertVariant>,
 ) => {
+  const sanitizedData = sanitizeVariantData(data);
   const rows = await db
     .update(productVariants)
-    .set(data)
+    .set(sanitizedData)
     .where(eq(productVariants.id, id))
     .returning();
   console.log("Updated Variant:", rows);
@@ -89,42 +122,5 @@ export const deleteVariant = async (id: string) => {
 };
 
 export const permanentlyDeleteVariant = async (id: string) => {
-  await db
-    .delete(productVariantImages)
-    .where(eq(productVariantImages.variantId, id));
   await db.delete(productVariants).where(eq(productVariants.id, id));
-};
-
-// Variant Images
-export const addVariantImages = async (
-  variantId: string,
-  images: Array<{ imageUrl: string; isPrimary: boolean }>,
-) => {
-  const rows = await db
-    .insert(productVariantImages)
-    .values(
-      images.map((img) => ({
-        id: randomUUID(),
-        variantId,
-        imageUrl: img.imageUrl,
-        isPrimary: img.isPrimary,
-      })),
-    )
-    .returning();
-  console.log("Added Variant Images:", rows);
-  return rows;
-};
-
-export const getVariantImages = async (variantId: string) => {
-  const rows = await db
-    .select()
-    .from(productVariantImages)
-    .where(eq(productVariantImages.variantId, variantId));
-  return rows;
-};
-
-export const deleteVariantImages = async (variantId: string) => {
-  await db
-    .delete(productVariantImages)
-    .where(eq(productVariantImages.variantId, variantId));
 };

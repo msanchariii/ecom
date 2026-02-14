@@ -1,3 +1,19 @@
+/**
+ * Product Detail Page
+ *
+ * Route: /products/[id]
+ * The [id] parameter represents a VARIANT ID (not a product ID)
+ *
+ * This page displays the full product details including:
+ * - All available variants (different color/size combinations)
+ * - Variant-specific images from product_variant_images table
+ * - Product gallery with color-based image switching
+ *
+ * When a user clicks on a product from the listing page, they navigate
+ * to this page with a specific variant ID, which loads the product and
+ * shows all its available SKUs/variants.
+ */
+
 import Link from "next/link";
 import { Suspense } from "react";
 import {
@@ -17,7 +33,11 @@ import {
   type RecommendedProduct,
 } from "@/lib/actions/product";
 
-type GalleryVariant = { color: string; images: string[] };
+type GalleryVariant = {
+  id: string; // variant ID for URL navigation
+  color: string;
+  images: string[];
+};
 
 function formatPrice(price: number | null | undefined) {
   if (price === null || price === undefined) return undefined;
@@ -119,14 +139,23 @@ async function AlsoLikeSection({ productId }: { productId: string }) {
   );
 }
 
+// Route: /products/[id] where [id] is the variant ID (SKU identifier)
+// This allows each product variant to have its own dedicated page
 export default async function ProductDetailPage({
   params,
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const { id } = await params;
-  // ID here is actually a variant ID from the listing page
-  const data = await getProductByVariantId(id);
+  const { id: variantId } = await params;
+
+  // Try to fetch by variant ID first, fallback to product ID
+  // This allows linking by either variant or product ID
+  let data = await getProductByVariantId(variantId);
+
+  // If not found as variant ID, try as product ID
+  if (!data) {
+    data = await getProduct(variantId);
+  }
 
   if (!data) {
     return (
@@ -148,17 +177,19 @@ export default async function ProductDetailPage({
 
   const { product, variants, images } = data;
 
+  // Group images by color (product+color now, not variant)
   const galleryVariants: GalleryVariant[] = variants.map((v) => {
     const imgs = images
-      .filter((img) => img.variantId === v.id)
+      .filter((img) => img.colorId === v.colorId)
       .sort((a, b) => {
         if (a.isPrimary && !b.isPrimary) return -1;
         if (!a.isPrimary && b.isPrimary) return 1;
-        return 0;
+        return (a.sortOrder ?? 0) - (b.sortOrder ?? 0);
       })
       .map((img) => img.url);
 
     return {
+      id: v.id,
       color: v.color?.name || "Default",
       images: imgs,
     };
@@ -192,6 +223,28 @@ export default async function ProductDetailPage({
 
   const primaryImage = galleryVariants[0]?.images[0] || undefined;
 
+  // Create a map of variant IDs to their primary images (by color)
+  const variantImages: Record<string, string> = {};
+  variants.forEach((v) => {
+    const variantImgs = images
+      .filter((img) => img.colorId === v.colorId)
+      .sort((a, b) => {
+        if (a.isPrimary && !b.isPrimary) return -1;
+        if (!a.isPrimary && b.isPrimary) return 1;
+        return (a.sortOrder ?? 0) - (b.sortOrder ?? 0);
+      });
+    if (variantImgs.length > 0) {
+      variantImages[v.id] = variantImgs[0].url;
+    }
+  });
+
+  // Find the index of the current variant in the filtered gallery variants
+  const currentVariantIndex = filteredGalleryVariants.findIndex(
+    (gv) => gv.id === variantId,
+  );
+  const initialVariantIndex =
+    currentVariantIndex >= 0 ? currentVariantIndex : 0;
+
   return (
     <main className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
       <nav className="py-4 text-caption text-dark-700">
@@ -210,6 +263,7 @@ export default async function ProductDetailPage({
           <ProductGallery
             productId={product.id}
             variants={filteredGalleryVariants}
+            initialVariantIndex={initialVariantIndex}
             className="lg:sticky lg:top-6"
           />
         )}
@@ -238,7 +292,11 @@ export default async function ProductDetailPage({
             )}
           </div>
 
-          <ColorSwatches productId={product.id} variants={galleryVariants} />
+          <ColorSwatches
+            productId={product.id}
+            variants={galleryVariants}
+            initialVariantIndex={initialVariantIndex}
+          />
 
           <ProductActions
             productId={product.id}
@@ -246,6 +304,7 @@ export default async function ProductDetailPage({
             variants={variants}
             defaultVariantId={product.defaultVariantId}
             primaryImage={primaryImage}
+            variantImages={variantImages}
           />
 
           <CollapsibleSection title="Product Details" defaultOpen>

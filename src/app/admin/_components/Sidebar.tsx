@@ -22,8 +22,13 @@ const navItems = [
     icon: LayoutDashboard,
   },
   {
-    name: "Product Listings",
+    name: "Products",
     href: "/admin/products",
+    icon: Package,
+  },
+  {
+    name: "Listings",
+    href: "/admin/listings",
     icon: Package,
   },
   {

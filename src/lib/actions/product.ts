@@ -8,7 +8,6 @@ import {
   eq,
   ilike,
   inArray,
-  isNull,
   or,
   sql,
   type SQL,
@@ -20,7 +19,6 @@ import {
   genders,
   productImages,
   productVariants,
-  productVariantImages,
   products,
   sizes,
   colors,
@@ -46,6 +44,7 @@ type ProductListItem = {
   maxPrice: number | null;
   createdAt: Date;
   subtitle?: string | null;
+  defaultVariantId?: string | null;
 };
 
 type VariantListItem = {
@@ -169,41 +168,35 @@ export async function getAllProducts(
     .from(productVariants)
     .where(variantConds.length ? and(...variantConds) : undefined)
     .as("v");
-  const imagesJoin = hasColor
-    ? db
-        .select({
-          productId: productImages.productId,
-          url: productImages.url,
-          rn: sql<number>`row_number() over (partition by ${productImages.productId} order by ${productImages.isPrimary} desc, ${productImages.sortOrder} asc)`.as(
-            "rn",
-          ),
-        })
-        .from(productImages)
-        .innerJoin(
-          productVariants,
-          eq(productVariants.id, productImages.variantId),
-        )
-        .where(
-          inArray(
-            productVariants.colorId,
+
+  // Get images with row number for each product+color combination
+  // Also add global_rn for fallback when no default variant exists
+  const imagesJoin = db
+    .select({
+      productId: productImages.productId,
+      colorId: productImages.colorId,
+      url: productImages.url,
+      rn: sql<number>`row_number() over (partition by ${productImages.productId}, ${productImages.colorId} order by ${productImages.isPrimary} desc, ${productImages.sortOrder} asc)`.as(
+        "rn",
+      ),
+      globalRn:
+        sql<number>`row_number() over (partition by ${productImages.productId} order by ${productImages.isPrimary} desc, ${productImages.sortOrder} asc)`.as(
+          "global_rn",
+        ),
+    })
+    .from(productImages)
+    .where(
+      hasColor
+        ? inArray(
+            productImages.colorId,
             db
               .select({ id: colors.id })
               .from(colors)
               .where(inArray(colors.slug, filters.colorSlugs)),
-          ),
-        )
-        .as("pi")
-    : db
-        .select({
-          productId: productImages.productId,
-          url: productImages.url,
-          rn: sql<number>`row_number() over (partition by ${productImages.productId} order by ${productImages.isPrimary} desc, ${productImages.sortOrder} asc)`.as(
-            "rn",
-          ),
-        })
-        .from(productImages)
-        .where(isNull(productImages.variantId))
-        .as("pi");
+          )
+        : undefined,
+    )
+    .as("pi");
 
   const baseWhere = conds.length ? and(...conds) : undefined;
 
@@ -212,9 +205,18 @@ export async function getAllProducts(
     maxPrice: sql<number | null>`max(${variantJoin.price})`,
   };
 
-  const imageAgg = sql<
-    string | null
-  >`max(case when ${imagesJoin.rn} = 1 then ${imagesJoin.url} else null end)`;
+  // Get primary image with fallback logic:
+  // 1. If we have a color match (from filter or default variant), use rn=1
+  // 2. If no default variant exists, fallback to global_rn=1 (any image for product)
+  const imageAgg = sql<string | null>`
+    max(
+      case 
+        when ${imagesJoin.rn} = 1 then ${imagesJoin.url}
+        when ${imagesJoin.globalRn} = 1 then ${imagesJoin.url}
+        else null 
+      end
+    )
+  `.as("imageUrl");
 
   const primaryOrder =
     filters.sort === "price_asc"
@@ -227,24 +229,56 @@ export async function getAllProducts(
   const limit = Math.max(1, Math.min(filters.limit, 60));
   const offset = (page - 1) * limit;
 
+  // Create a subquery for default variant to get only colorId
+  // This avoids column name conflicts with variantJoin
+  const defaultVariantColor = db
+    .select({
+      variantId: productVariants.id,
+      colorId: productVariants.colorId,
+    })
+    .from(productVariants)
+    .as("dvc");
+
   const rows = await db
     .select({
       id: products.id,
       name: products.name,
       createdAt: products.createdAt,
       subtitle: genders.label,
+      defaultVariantId: products.defaultVariantId,
       minPrice: priceAgg.minPrice,
       maxPrice: priceAgg.maxPrice,
       imageUrl: imageAgg,
     })
     .from(products)
     .leftJoin(variantJoin, eq(variantJoin.productId, products.id))
-    .leftJoin(imagesJoin, eq(imagesJoin.productId, products.id))
+    .leftJoin(
+      defaultVariantColor,
+      eq(defaultVariantColor.variantId, products.defaultVariantId),
+    )
+    .leftJoin(
+      imagesJoin,
+      hasColor
+        ? eq(imagesJoin.productId, products.id) // Color filter applied - already filtered in WHERE
+        : and(
+            eq(imagesJoin.productId, products.id),
+            or(
+              eq(imagesJoin.colorId, defaultVariantColor.colorId), // Match default variant's color
+              sql`${defaultVariantColor.colorId} IS NULL`, // Or no default variant - get all images
+            ),
+          ),
+    )
     .leftJoin(genders, eq(genders.id, products.genderId))
     .leftJoin(brands, eq(brands.id, products.brandId))
     .leftJoin(categories, eq(categories.id, products.categoryId))
     .where(baseWhere)
-    .groupBy(products.id, products.name, products.createdAt, genders.label)
+    .groupBy(
+      products.id,
+      products.name,
+      products.createdAt,
+      genders.label,
+      products.defaultVariantId,
+    )
     .orderBy(primaryOrder, desc(products.createdAt), asc(products.id))
     .limit(limit)
     .offset(offset);
@@ -267,6 +301,7 @@ export async function getAllProducts(
     maxPrice: r.maxPrice === null ? null : Number(r.maxPrice),
     createdAt: r.createdAt,
     subtitle: r.subtitle ? `${r.subtitle} Shoes` : null,
+    defaultVariantId: r.defaultVariantId,
   }));
 
   const totalCount = countRows[0]?.cnt ?? 0;
@@ -274,6 +309,25 @@ export async function getAllProducts(
   return { products: productsOut, totalCount };
 }
 
+/**
+ * Get all product variants for listing page
+ *
+ * This function returns individual VARIANTS (SKUs), not products.
+ * Each variant represents a unique combination of product + color + size.
+ *
+ * Used by: /products listing page
+ *
+ * Features:
+ * - Returns variants with their specific images from product_variant_images
+ * - Filters by gender, brand, category, size, color, price
+ * - Supports sorting and pagination
+ * - Each variant includes its own image, price, and attributes
+ *
+ * The returned variant IDs are used to link to /products/[variantId]
+ *
+ * @param filters - Normalized filter parameters (search, gender, size, color, price, etc.)
+ * @returns Array of variants with their images and metadata
+ */
 export async function getAllProductVariantsForListing(
   filters: NormalizedProductFilters,
 ): Promise<GetAllVariantsResult> {
@@ -366,16 +420,17 @@ export async function getAllProductVariantsForListing(
   const limit = Math.max(1, Math.min(filters.limit, 60));
   const offset = (page - 1) * limit;
 
-  // Get primary image for each variant from productVariantImages table
+  // Get primary image for each product+color from productImages table
   const imagesSubquery = db
     .select({
-      variantId: productVariantImages.variantId,
-      url: productVariantImages.imageUrl,
-      rn: sql<number>`row_number() over (partition by ${productVariantImages.variantId} order by ${productVariantImages.isPrimary} desc)`.as(
+      productId: productImages.productId,
+      colorId: productImages.colorId,
+      url: productImages.url,
+      rn: sql<number>`row_number() over (partition by ${productImages.productId}, ${productImages.colorId} order by ${productImages.isPrimary} desc)`.as(
         "rn",
       ),
     })
-    .from(productVariantImages)
+    .from(productImages)
     .as("img");
 
   let orderByClause;
@@ -422,7 +477,14 @@ export async function getAllProductVariantsForListing(
     .leftJoin(genders, eq(genders.id, products.genderId))
     .leftJoin(brands, eq(brands.id, products.brandId))
     .leftJoin(categories, eq(categories.id, products.categoryId))
-    .leftJoin(imagesSubquery, eq(imagesSubquery.variantId, productVariants.id))
+    .leftJoin(
+      imagesSubquery,
+      and(
+        eq(imagesSubquery.productId, products.id),
+        eq(imagesSubquery.colorId, productVariants.colorId),
+        eq(imagesSubquery.rn, 1),
+      ),
+    )
     .where(and(baseWhere, variantWhere))
     .groupBy(
       productVariants.id,
@@ -531,19 +593,63 @@ export async function getProductsForAdmin(): Promise<ProductListItem[]> {
 export async function getLatestProducts(
   limit: number,
 ): Promise<ProductListItem[]> {
+  const imagesJoin = db
+    .select({
+      productId: productImages.productId,
+      colorId: productImages.colorId,
+      url: productImages.url,
+      rn: sql<number>`row_number() over (partition by ${productImages.productId}, ${productImages.colorId} order by ${productImages.isPrimary} desc, ${productImages.sortOrder} asc)`.as(
+        "rn",
+      ),
+      globalRn:
+        sql<number>`row_number() over (partition by ${productImages.productId} order by ${productImages.isPrimary} desc, ${productImages.sortOrder} asc)`.as(
+          "global_rn",
+        ),
+    })
+    .from(productImages)
+    .as("pi");
+
+  // Create alias for default variant to get its color
+  const defaultVar = db.$with("default_var").as(
+    db
+      .select({
+        productId: productVariants.productId,
+        colorId: productVariants.colorId,
+      })
+      .from(productVariants)
+      .innerJoin(products, eq(products.defaultVariantId, productVariants.id)),
+  );
+
   const rows = await db
+    .with(defaultVar)
     .select({
       id: products.id,
       name: products.name,
       createdAt: products.createdAt,
       minPrice: sql<number | null>`min(${productVariants.price}::numeric)`,
-      imageUrl: sql<
-        string | null
-      >`max(case when ${productImages.isPrimary} = true then ${productImages.url} else null end)`,
+      imageUrl: sql<string | null>`
+        max(
+          case 
+            when ${imagesJoin.rn} = 1 then ${imagesJoin.url}
+            when ${imagesJoin.globalRn} = 1 then ${imagesJoin.url}
+            else null 
+          end
+        )
+      `,
     })
     .from(products)
     .leftJoin(productVariants, eq(productVariants.productId, products.id))
-    .leftJoin(productImages, eq(productImages.productId, products.id))
+    .leftJoin(defaultVar, eq(defaultVar.productId, products.id))
+    .leftJoin(
+      imagesJoin,
+      and(
+        eq(imagesJoin.productId, products.id),
+        or(
+          eq(imagesJoin.colorId, defaultVar.colorId),
+          sql`${defaultVar.colorId} IS NULL`,
+        ),
+      ),
+    )
     .where(eq(products.isPublished, true))
     .groupBy(products.id, products.name, products.createdAt)
     .orderBy(desc(products.createdAt), asc(products.id))
@@ -564,13 +670,14 @@ export async function getLatestVariants(
 ): Promise<VariantListItem[]> {
   const imagesSubquery = db
     .select({
-      variantId: productVariantImages.variantId,
-      url: productVariantImages.imageUrl,
-      rn: sql<number>`row_number() over (partition by ${productVariantImages.variantId} order by ${productVariantImages.isPrimary} desc)`.as(
+      productId: productImages.productId,
+      colorId: productImages.colorId,
+      url: productImages.url,
+      rn: sql<number>`row_number() over (partition by ${productImages.productId}, ${productImages.colorId} order by ${productImages.isPrimary} desc)`.as(
         "rn",
       ),
     })
-    .from(productVariantImages)
+    .from(productImages)
     .as("img");
 
   const rows = await db
@@ -594,7 +701,14 @@ export async function getLatestVariants(
     .leftJoin(colors, eq(colors.id, productVariants.colorId))
     .leftJoin(sizes, eq(sizes.id, productVariants.sizeId))
     .leftJoin(genders, eq(genders.id, products.genderId))
-    .leftJoin(imagesSubquery, eq(imagesSubquery.variantId, productVariants.id))
+    .leftJoin(
+      imagesSubquery,
+      and(
+        eq(imagesSubquery.productId, products.id),
+        eq(imagesSubquery.colorId, productVariants.colorId),
+        eq(imagesSubquery.rn, 1),
+      ),
+    )
     .where(eq(products.isPublished, true))
     .groupBy(
       productVariants.id,
@@ -690,10 +804,13 @@ export async function getProduct(
       sizeSlug: sizes.slug,
       sizeSortOrder: sizes.sortOrder,
 
-      imageId: productVariantImages.id,
-      imageUrl: productVariantImages.imageUrl,
-      imageIsPrimary: productVariantImages.isPrimary,
-      imageVariantId: productVariantImages.variantId,
+      imageId: productImages.id,
+      imageUrl: productImages.url,
+      imageIsPrimary: productImages.isPrimary,
+      imageSortOrder: productImages.sortOrder,
+      imageProductId: productImages.productId,
+      imageColorId: productImages.colorId,
+      imageCreatedAt: productImages.createdAt,
     })
     .from(products)
     .leftJoin(brands, eq(brands.id, products.brandId))
@@ -703,8 +820,11 @@ export async function getProduct(
     .leftJoin(colors, eq(colors.id, productVariants.colorId))
     .leftJoin(sizes, eq(sizes.id, productVariants.sizeId))
     .leftJoin(
-      productVariantImages,
-      eq(productVariantImages.variantId, productVariants.id),
+      productImages,
+      and(
+        eq(productImages.productId, products.id),
+        eq(productImages.colorId, productVariants.colorId),
+      ),
     )
     .where(eq(products.id, productId));
 
@@ -792,10 +912,11 @@ export async function getProduct(
       imagesMap.set(r.imageId, {
         id: r.imageId,
         productId: head.productId,
-        variantId: r.imageVariantId ?? null,
+        colorId: r.imageColorId!,
         url: r.imageUrl!,
-        sortOrder: 0,
+        sortOrder: r.imageSortOrder ?? 0,
         isPrimary: r.imageIsPrimary ?? false,
+        createdAt: r.imageCreatedAt!,
       });
     }
   }
@@ -807,6 +928,25 @@ export async function getProduct(
   };
 }
 
+/**
+ * Get product data by variant ID
+ *
+ * This function is used by the product detail page (/products/[id])
+ * where [id] is actually a variant ID.
+ *
+ * Flow:
+ * 1. Takes a variant ID as input
+ * 2. Looks up the parent product ID from the variant
+ * 3. Returns the full product with all its variants and images
+ *
+ * This allows the detail page to:
+ * - Show the full product information
+ * - Display all available variants (different colors/sizes)
+ * - Allow users to switch between variants
+ *
+ * @param variantId - The UUID of the product variant (SKU)
+ * @returns Full product data with all variants, or null if not found
+ */
 export async function getProductByVariantId(
   variantId: string,
 ): Promise<FullProduct | null> {
@@ -893,13 +1033,14 @@ export async function getRecommendedProducts(
 
   const pi = db
     .select({
-      variantId: productVariantImages.variantId,
-      url: productVariantImages.imageUrl,
-      rn: sql<number>`row_number() over (partition by ${productVariantImages.variantId} order by ${productVariantImages.isPrimary} desc)`.as(
+      productId: productImages.productId,
+      colorId: productImages.colorId,
+      url: productImages.url,
+      rn: sql<number>`row_number() over (partition by ${productImages.productId}, ${productImages.colorId} order by ${productImages.isPrimary} desc)`.as(
         "rn",
       ),
     })
-    .from(productVariantImages)
+    .from(productImages)
     .as("pi");
 
   const priority = sql<number>`
@@ -907,6 +1048,16 @@ export async function getRecommendedProducts(
     (case when ${products.brandId} is not null and ${products.brandId} = ${b.brandId} then 1 else 0 end) * 2 +
     (case when ${products.genderId} is not null and ${products.genderId} = ${b.genderId} then 1 else 0 end) * 1
   `;
+
+  // Get default variant to find its color for images
+  const defaultVariant = db
+    .select({
+      id: productVariants.id,
+      productId: productVariants.productId,
+      colorId: productVariants.colorId,
+    })
+    .from(productVariants)
+    .as("default_variant");
 
   const rows = await db
     .select({
@@ -916,12 +1067,20 @@ export async function getRecommendedProducts(
       minPrice: sql<number | null>`min(${v.price})`,
       imageUrl: sql<
         string | null
-      >`max(case when ${pi.rn} = 1 and ${pi.variantId} = ${products.defaultVariantId} then ${pi.url} else null end)`,
+      >`max(case when ${pi.rn} = 1 then ${pi.url} else null end)`,
       createdAt: products.createdAt,
     })
     .from(products)
     .leftJoin(v, eq(v.productId, products.id))
-    .leftJoin(pi, eq(pi.variantId, products.defaultVariantId))
+    .leftJoin(defaultVariant, eq(defaultVariant.id, products.defaultVariantId))
+    .leftJoin(
+      pi,
+      and(
+        eq(pi.productId, products.id),
+        eq(pi.colorId, defaultVariant.colorId),
+        eq(pi.rn, 1),
+      ),
+    )
     .where(
       and(eq(products.isPublished, true), sql`${products.id} <> ${productId}`),
     )

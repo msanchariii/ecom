@@ -32,6 +32,8 @@ export default async function VariantsPage() {
               <TableHead>SKU</TableHead>
               <TableHead>Product Name</TableHead>
               <TableHead>Price</TableHead>
+              <TableHead>Size</TableHead>
+
               <TableHead>Stock</TableHead>
               <TableHead>Actions</TableHead>
             </TableRow>
@@ -42,6 +44,7 @@ export default async function VariantsPage() {
                 <TableCell>{variant.sku}</TableCell>
                 <TableCell>{variant.productName}</TableCell>
                 <TableCell>₹{variant.price}</TableCell>
+                <TableCell>{variant.size}</TableCell>
                 <TableCell>{variant.inStock}</TableCell>
                 <TableCell>
                   <Button variant="outline" size="sm" asChild>
