@@ -186,9 +186,12 @@ export default function CartPage() {
               </span>
             </div>
 
-            <button className="mt-6 w-full rounded-md bg-dark-900 px-6 py-3 text-body font-medium text-light-100 transition-colors hover:bg-dark-700">
+            <Link
+              href="/checkout"
+              className="mt-6 block w-full rounded-md bg-dark-900 px-6 py-3 text-center text-body font-medium text-light-100 transition-colors hover:bg-dark-700"
+            >
               Proceed to Checkout
-            </button>
+            </Link>
 
             <div className="mt-4 space-y-2 text-caption text-dark-500">
               <p className="flex items-center gap-2">
