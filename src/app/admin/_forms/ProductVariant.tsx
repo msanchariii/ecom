@@ -7,8 +7,6 @@ import { useForm } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { Check } from "lucide-react";
-import Image from "next/image";
 import {
   getProducts,
   getProductImages,
@@ -346,57 +344,29 @@ const ProductVariantForm = ({ variant }: ProductVariantFormProps) => {
               </p>
             </div>
           ) : (
-            <div className="border border-gray-300 rounded-md p-3 max-h-80 overflow-y-auto space-y-2">
-              {availableColors.map((color) => (
-                <label
-                  key={color.id}
-                  className={`flex items-center gap-3 p-2 rounded-lg cursor-pointer transition-all ${
-                    watch("colorId") === color.id
-                      ? "bg-blue-50 border-2 border-blue-500"
-                      : "hover:bg-gray-50 border-2 border-transparent"
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    value={color.id}
-                    {...register("colorId")}
-                    className="sr-only"
-                  />
-                  <div className="relative shrink-0">
-                    {color.primaryImageUrl ? (
-                      <Image
-                        src={color.primaryImageUrl}
-                        alt={color.name}
-                        width={48}
-                        height={48}
-                        className="w-12 h-12 object-cover rounded-md border border-gray-200"
-                      />
-                    ) : (
-                      <div
-                        className="w-12 h-12 rounded-md border border-gray-200"
-                        style={{ backgroundColor: color.hexCode }}
-                      />
-                    )}
-                    {watch("colorId") === color.id && (
-                      <div className="absolute -top-1 -right-1 bg-blue-500 text-white rounded-full p-0.5">
-                        <Check size={12} />
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex-1">
-                    <p className="font-medium text-sm">{color.name}</p>
-                    <div className="flex items-center gap-2 mt-1">
-                      <div
-                        className="w-4 h-4 rounded-sm border border-gray-300"
-                        style={{ backgroundColor: color.hexCode }}
-                      />
-                      <span className="text-xs text-gray-500">
-                        {color.hexCode}
-                      </span>
-                    </div>
-                  </div>
-                </label>
-              ))}
+            <div className="flex gap-2">
+              <NativeSelect
+                id="colorId"
+                {...register("colorId")}
+                className="flex-1"
+              >
+                <NativeSelectOption value="">Select a color</NativeSelectOption>
+                {availableColors.map((color) => (
+                  <NativeSelectOption key={color.id} value={color.id}>
+                    {color.name}
+                  </NativeSelectOption>
+                ))}
+              </NativeSelect>
+              {watch("colorId") && (
+                <div
+                  className="w-10 h-10 rounded-md border border-gray-300 shrink-0"
+                  style={{
+                    backgroundColor:
+                      availableColors.find((c) => c.id === watch("colorId"))
+                        ?.hexCode || "#fff",
+                  }}
+                />
+              )}
             </div>
           )}
           {errors.colorId && (
