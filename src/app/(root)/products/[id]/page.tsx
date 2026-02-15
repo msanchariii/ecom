@@ -19,9 +19,9 @@ import { getProductDetails } from "@/lib/actions/product";
 import Link from "next/link";
 import Image from "next/image";
 import CollapsibleSection from "@/components/CollapsibleSection";
-import ProductGalleryWrapper from "./ProductGalleryWrapper";
-import ColorSwatchesWrapper from "./ColorSwatchesWrapper";
-import ProductActionsWrapper from "./ProductActionsWrapper";
+import ProductGalleryWrapper from "@/components/ProductGalleryWrapper";
+import ColorSwatchesWrapper from "@/components/ColorSwatchesWrapper";
+import ProductActionsWrapper from "@/components/ProductActionsWrapper";
 
 function formatPrice(price: number | string | null | undefined) {
   if (price === null || price === undefined) return undefined;

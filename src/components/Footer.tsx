@@ -12,17 +12,27 @@ const columns = [
   },
   {
     title: "Clothing",
-    links: ["All Clothing", "Modest Wear", "Hoodies & Pullovers", "Shirts & Tops"],
+    links: [
+      "All Clothing",
+      "Modest Wear",
+      "Hoodies & Pullovers",
+      "Shirts & Tops",
+    ],
   },
   {
     title: "Kids'",
-    links: ["Infant & Toddler Shoes", "Kids' Shoes", "Kids' Jordan Shoes", "Kids' Basketball Shoes"],
+    links: [
+      "Infant & Toddler Shoes",
+      "Kids' Shoes",
+      "Kids' Jordan Shoes",
+      "Kids' Basketball Shoes",
+    ],
   },
 ] as const;
 
 export default function Footer() {
   return (
-    <footer className="bg-dark-900 text-light-100">
+    <footer className="bg-dark-900 mt-16 lg:mt-24 text-light-100">
       <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 items-start gap-8 md:grid-cols-12">
           <div className="flex items-start md:col-span-3">
@@ -76,7 +86,12 @@ export default function Footer() {
             <span>© 2025 Nike, Inc. All Rights Reserved</span>
           </div>
           <ul className="flex items-center gap-6 text-caption">
-            {["Guides", "Terms of Sale", "Terms of Use", "Nike Privacy Policy"].map((t) => (
+            {[
+              "Guides",
+              "Terms of Sale",
+              "Terms of Use",
+              "Nike Privacy Policy",
+            ].map((t) => (
               <li key={t}>
                 <Link href="#">{t}</Link>
               </li>

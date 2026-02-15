@@ -6,8 +6,10 @@ import {
   count,
   desc,
   eq,
+  gte,
   ilike,
   inArray,
+  lte,
   or,
   sql,
   type SQL,
@@ -71,468 +73,232 @@ export type GetAllVariantsResult = {
   totalCount: number;
 };
 
-export async function getAllProducts(
-  filters: NormalizedProductFilters,
-): Promise<GetAllProductsResult> {
-  const conds: SQL[] = [eq(products.isPublished, true)];
+// export async function getAllProducts(filters: NormalizedProductFilters) {
+//   const page = Math.max(1, filters.page);
+//   const limit = Math.max(1, Math.min(filters.limit, 60));
+//   const offset = (page - 1) * limit;
 
-  if (filters.search) {
-    const pattern = `%${filters.search}%`;
-    conds.push(
-      or(ilike(products.name, pattern), ilike(products.description, pattern))!,
-    );
+//   const productConds: SQL[] = [eq(products.isPublished, true)];
+
+//   if (filters.genderSlugs.length) {
+//     productConds.push(inArray(genders.slug, filters.genderSlugs));
+//   }
+
+//   if (filters.brandSlugs.length) {
+//     productConds.push(inArray(brands.slug, filters.brandSlugs));
+//   }
+
+//   if (filters.categorySlugs.length) {
+//     productConds.push(inArray(categories.slug, filters.categorySlugs));
+//   }
+
+//   const variantConds: SQL[] = [];
+
+//   if (filters.sizeSlugs.length) {
+//     variantConds.push(
+//       inArray(
+//         productVariants.sizeId,
+//         db
+//           .select({ id: sizes.id })
+//           .from(sizes)
+//           .where(inArray(sizes.slug, filters.sizeSlugs)),
+//       ),
+//     );
+//   }
+
+//   if (filters.colorSlugs.length) {
+//     variantConds.push(
+//       inArray(
+//         productVariants.colorId,
+//         db
+//           .select({ id: colors.id })
+//           .from(colors)
+//           .where(inArray(colors.slug, filters.colorSlugs)),
+//       ),
+//     );
+//   }
+
+//   // Price filtering
+//   if (filters.priceRanges.length) {
+//     const priceConds = filters.priceRanges.map(([min, max]) => {
+//       const c: SQL[] = [];
+//       if (min !== undefined)
+//         c.push(sql`${productVariants.price}::numeric >= ${min}`);
+//       if (max !== undefined)
+//         c.push(sql`${productVariants.price}::numeric <= ${max}`);
+//       return and(...c)!;
+//     });
+
+//     variantConds.push(or(...priceConds)!);
+//   }
+
+//   // STEP 1: Collapse variants first
+//   const filteredVariantGroups = db
+//     .select({
+//       productId: productVariants.productId,
+//       colorId: productVariants.colorId,
+//       minPrice: sql<number>`min(${productVariants.price}::numeric)`.as(
+//         "min_price",
+//       ),
+//       maxPrice: sql<number>`max(${productVariants.price}::numeric)`.as(
+//         "max_price",
+//       ),
+//     })
+//     .from(productVariants)
+//     .where(variantConds.length ? and(...variantConds) : undefined)
+//     .groupBy(productVariants.productId, productVariants.colorId)
+//     .as("fv");
+
+//   // STEP 2: Main query
+//   const rows = await db
+//     .select({
+//       productId: products.id,
+//       name: products.name,
+//       colorId: filteredVariantGroups.colorId,
+//       minPrice: filteredVariantGroups.minPrice,
+//       maxPrice: filteredVariantGroups.maxPrice,
+//     })
+//     .from(filteredVariantGroups)
+//     .innerJoin(products, eq(products.id, filteredVariantGroups.productId))
+//     .leftJoin(genders, eq(genders.id, products.genderId))
+//     .leftJoin(brands, eq(brands.id, products.brandId))
+//     .leftJoin(categories, eq(categories.id, products.categoryId))
+//     .where(productConds.length ? and(...productConds) : undefined)
+//     .orderBy(desc(products.createdAt))
+//     .limit(limit)
+//     .offset(offset);
+
+//   // Count distinct product+color
+//   const countRows = await db
+//     .select({
+//       cnt: count(),
+//     })
+//     .from(filteredVariantGroups);
+
+//   return {
+//     products: rows,
+//     totalCount: countRows[0]?.cnt ?? 0,
+//   };
+// }
+
+export const getAllProducts = async ({
+  genderSlugs = [],
+  sizeSlugs = [],
+  colorSlugs = [],
+  priceRanges = [],
+  page = 1,
+  limit = 12,
+}: {
+  genderSlugs?: string[];
+  sizeSlugs?: string[];
+  colorSlugs?: string[];
+  priceRanges?: Array<[number | undefined, number | undefined]>;
+  page?: number;
+  limit?: number;
+}) => {
+  const offset = (page - 1) * limit;
+
+  const conditions: SQL[] = [
+    eq(products.isPublished, true),
+    eq(productVariants.isActive, true),
+    eq(productVariants.isDeleted, false),
+  ];
+
+  // Gender filter
+  if (genderSlugs.length) {
+    conditions.push(inArray(genders.slug, genderSlugs));
   }
 
-  if (filters.genderSlugs.length) {
-    conds.push(inArray(genders.slug, filters.genderSlugs));
-  }
-
-  if (filters.brandSlugs.length) {
-    conds.push(inArray(brands.slug, filters.brandSlugs));
-  }
-
-  if (filters.categorySlugs.length) {
-    conds.push(inArray(categories.slug, filters.categorySlugs));
-  }
-
-  const hasSize = filters.sizeSlugs.length > 0;
-  const hasColor = filters.colorSlugs.length > 0;
-  const hasPrice = !!(
-    filters.priceMin !== undefined ||
-    filters.priceMax !== undefined ||
-    filters.priceRanges.length
-  );
-
-  const variantConds: SQL[] = [];
-  if (hasSize) {
-    variantConds.push(
+  // Size filter
+  if (sizeSlugs.length) {
+    conditions.push(
       inArray(
         productVariants.sizeId,
         db
           .select({ id: sizes.id })
           .from(sizes)
-          .where(inArray(sizes.slug, filters.sizeSlugs)),
-      ),
-    );
-  }
-  if (hasColor) {
-    variantConds.push(
-      inArray(
-        productVariants.colorId,
-        db
-          .select({ id: colors.id })
-          .from(colors)
-          .where(inArray(colors.slug, filters.colorSlugs)),
-      ),
-    );
-  }
-  if (hasPrice) {
-    const priceBounds: SQL[] = [];
-    if (filters.priceRanges.length) {
-      for (const [min, max] of filters.priceRanges) {
-        const subConds: SQL[] = [];
-        if (min !== undefined) {
-          subConds.push(sql`(${productVariants.price})::numeric >= ${min}`);
-        }
-        if (max !== undefined) {
-          subConds.push(sql`(${productVariants.price})::numeric <= ${max}`);
-        }
-        if (subConds.length) priceBounds.push(and(...subConds)!);
-      }
-    }
-    if (filters.priceMin !== undefined || filters.priceMax !== undefined) {
-      const subConds: SQL[] = [];
-      if (filters.priceMin !== undefined)
-        subConds.push(
-          sql`(${productVariants.price})::numeric >= ${filters.priceMin}`,
-        );
-      if (filters.priceMax !== undefined)
-        subConds.push(
-          sql`(${productVariants.price})::numeric <= ${filters.priceMax}`,
-        );
-      if (subConds.length) priceBounds.push(and(...subConds)!);
-    }
-    if (priceBounds.length) {
-      variantConds.push(or(...priceBounds)!);
-    }
-  }
-
-  const variantJoin = db
-    .select({
-      variantId: productVariants.id,
-      productId: productVariants.productId,
-      price: sql<number>`${productVariants.price}::numeric`.as("price"),
-      colorId: productVariants.colorId,
-      sizeId: productVariants.sizeId,
-    })
-    .from(productVariants)
-    .where(variantConds.length ? and(...variantConds) : undefined)
-    .as("v");
-
-  // Get images with row number for each product+color combination
-  // Also add global_rn for fallback when no default variant exists
-  const imagesJoin = db
-    .select({
-      productId: productImages.productId,
-      colorId: productImages.colorId,
-      url: productImages.url,
-      rn: sql<number>`row_number() over (partition by ${productImages.productId}, ${productImages.colorId} order by ${productImages.isPrimary} desc, ${productImages.sortOrder} asc)`.as(
-        "rn",
-      ),
-      globalRn:
-        sql<number>`row_number() over (partition by ${productImages.productId} order by ${productImages.isPrimary} desc, ${productImages.sortOrder} asc)`.as(
-          "global_rn",
-        ),
-    })
-    .from(productImages)
-    .where(
-      hasColor
-        ? inArray(
-            productImages.colorId,
-            db
-              .select({ id: colors.id })
-              .from(colors)
-              .where(inArray(colors.slug, filters.colorSlugs)),
-          )
-        : undefined,
-    )
-    .as("pi");
-
-  const baseWhere = conds.length ? and(...conds) : undefined;
-
-  const priceAgg = {
-    minPrice: sql<number | null>`min(${variantJoin.price})`,
-    maxPrice: sql<number | null>`max(${variantJoin.price})`,
-  };
-
-  // Get primary image with fallback logic:
-  // 1. If we have a color match (from filter or default variant), use rn=1
-  // 2. If no default variant exists, fallback to global_rn=1 (any image for product)
-  const imageAgg = sql<string | null>`
-    max(
-      case 
-        when ${imagesJoin.rn} = 1 then ${imagesJoin.url}
-        when ${imagesJoin.globalRn} = 1 then ${imagesJoin.url}
-        else null 
-      end
-    )
-  `.as("imageUrl");
-
-  const primaryOrder =
-    filters.sort === "price_asc"
-      ? asc(sql`min(${variantJoin.price})`)
-      : filters.sort === "price_desc"
-        ? desc(sql`max(${variantJoin.price})`)
-        : desc(products.createdAt);
-
-  const page = Math.max(1, filters.page);
-  const limit = Math.max(1, Math.min(filters.limit, 60));
-  const offset = (page - 1) * limit;
-
-  // Create a subquery for default variant to get only colorId
-  // This avoids column name conflicts with variantJoin
-  const defaultVariantColor = db
-    .select({
-      variantId: productVariants.id,
-      colorId: productVariants.colorId,
-    })
-    .from(productVariants)
-    .as("dvc");
-
-  const rows = await db
-    .select({
-      id: products.id,
-      name: products.name,
-      createdAt: products.createdAt,
-      subtitle: genders.label,
-      defaultVariantId: products.defaultVariantId,
-      minPrice: priceAgg.minPrice,
-      maxPrice: priceAgg.maxPrice,
-      imageUrl: imageAgg,
-    })
-    .from(products)
-    .leftJoin(variantJoin, eq(variantJoin.productId, products.id))
-    .leftJoin(
-      defaultVariantColor,
-      eq(defaultVariantColor.variantId, products.defaultVariantId),
-    )
-    .leftJoin(
-      imagesJoin,
-      hasColor
-        ? eq(imagesJoin.productId, products.id) // Color filter applied - already filtered in WHERE
-        : and(
-            eq(imagesJoin.productId, products.id),
-            or(
-              eq(imagesJoin.colorId, defaultVariantColor.colorId), // Match default variant's color
-              sql`${defaultVariantColor.colorId} IS NULL`, // Or no default variant - get all images
-            ),
-          ),
-    )
-    .leftJoin(genders, eq(genders.id, products.genderId))
-    .leftJoin(brands, eq(brands.id, products.brandId))
-    .leftJoin(categories, eq(categories.id, products.categoryId))
-    .where(baseWhere)
-    .groupBy(
-      products.id,
-      products.name,
-      products.createdAt,
-      genders.label,
-      products.defaultVariantId,
-    )
-    .orderBy(primaryOrder, desc(products.createdAt), asc(products.id))
-    .limit(limit)
-    .offset(offset);
-  const countRows = await db
-    .select({
-      cnt: count(sql<number>`distinct ${products.id}`),
-    })
-    .from(products)
-    .leftJoin(variantJoin, eq(variantJoin.productId, products.id))
-    .leftJoin(genders, eq(genders.id, products.genderId))
-    .leftJoin(brands, eq(brands.id, products.brandId))
-    .leftJoin(categories, eq(categories.id, products.categoryId))
-    .where(baseWhere);
-
-  const productsOut: ProductListItem[] = rows.map((r) => ({
-    id: r.id,
-    name: r.name,
-    imageUrl: r.imageUrl,
-    minPrice: r.minPrice === null ? null : Number(r.minPrice),
-    maxPrice: r.maxPrice === null ? null : Number(r.maxPrice),
-    createdAt: r.createdAt,
-    subtitle: r.subtitle ? `${r.subtitle} Shoes` : null,
-    defaultVariantId: r.defaultVariantId,
-  }));
-
-  const totalCount = countRows[0]?.cnt ?? 0;
-
-  return { products: productsOut, totalCount };
-}
-
-/**
- * Get all product variants for listing page
- *
- * This function returns individual VARIANTS (SKUs), not products.
- * Each variant represents a unique combination of product + color + size.
- *
- * Used by: /products listing page
- *
- * Features:
- * - Returns variants with their specific images from product_variant_images
- * - Filters by gender, brand, category, size, color, price
- * - Supports sorting and pagination
- * - Each variant includes its own image, price, and attributes
- *
- * The returned variant IDs are used to link to /products/[variantId]
- *
- * @param filters - Normalized filter parameters (search, gender, size, color, price, etc.)
- * @returns Array of variants with their images and metadata
- */
-export async function getAllProductVariantsForListing(
-  filters: NormalizedProductFilters,
-): Promise<GetAllVariantsResult> {
-  const conds: SQL[] = [eq(products.isPublished, true)];
-
-  if (filters.search) {
-    const pattern = `%${filters.search}%`;
-    conds.push(
-      or(ilike(products.name, pattern), ilike(products.description, pattern))!,
-    );
-  }
-
-  if (filters.genderSlugs.length) {
-    conds.push(inArray(genders.slug, filters.genderSlugs));
-  }
-
-  if (filters.brandSlugs.length) {
-    conds.push(inArray(brands.slug, filters.brandSlugs));
-  }
-
-  if (filters.categorySlugs.length) {
-    conds.push(inArray(categories.slug, filters.categorySlugs));
-  }
-
-  const variantConds: SQL[] = [];
-  if (filters.sizeSlugs.length > 0) {
-    variantConds.push(
-      inArray(
-        productVariants.sizeId,
-        db
-          .select({ id: sizes.id })
-          .from(sizes)
-          .where(inArray(sizes.slug, filters.sizeSlugs)),
-      ),
-    );
-  }
-  if (filters.colorSlugs.length > 0) {
-    variantConds.push(
-      inArray(
-        productVariants.colorId,
-        db
-          .select({ id: colors.id })
-          .from(colors)
-          .where(inArray(colors.slug, filters.colorSlugs)),
+          .where(inArray(sizes.slug, sizeSlugs)),
       ),
     );
   }
 
-  const hasPrice = !!(
-    filters.priceMin !== undefined ||
-    filters.priceMax !== undefined ||
-    filters.priceRanges.length
-  );
-
-  if (hasPrice) {
-    const priceBounds: SQL[] = [];
-    if (filters.priceRanges.length) {
-      for (const [min, max] of filters.priceRanges) {
-        const subConds: SQL[] = [];
-        if (min !== undefined) {
-          subConds.push(sql`(${productVariants.price})::numeric >= ${min}`);
-        }
-        if (max !== undefined) {
-          subConds.push(sql`(${productVariants.price})::numeric <= ${max}`);
-        }
-        if (subConds.length) priceBounds.push(and(...subConds)!);
-      }
-    }
-    if (filters.priceMin !== undefined || filters.priceMax !== undefined) {
-      const subConds: SQL[] = [];
-      if (filters.priceMin !== undefined)
-        subConds.push(
-          sql`(${productVariants.price})::numeric >= ${filters.priceMin}`,
-        );
-      if (filters.priceMax !== undefined)
-        subConds.push(
-          sql`(${productVariants.price})::numeric <= ${filters.priceMax}`,
-        );
-      if (subConds.length) priceBounds.push(and(...subConds)!);
-    }
-    if (priceBounds.length) {
-      variantConds.push(or(...priceBounds)!);
-    }
+  // Color filter
+  if (colorSlugs.length) {
+    conditions.push(inArray(colors.slug, colorSlugs));
   }
 
-  const baseWhere = conds.length ? and(...conds) : undefined;
-  const variantWhere = variantConds.length ? and(...variantConds) : undefined;
+  // Price filter
+  if (priceRanges.length) {
+    const priceConds = priceRanges.map(([min, max]) => {
+      const sub: SQL[] = [];
+      if (min !== undefined)
+        sub.push(sql`${productVariants.price}::numeric >= ${min}`);
+      if (max !== undefined)
+        sub.push(sql`${productVariants.price}::numeric <= ${max}`);
+      return and(...sub)!;
+    });
 
-  const page = Math.max(1, filters.page);
-  const limit = Math.max(1, Math.min(filters.limit, 60));
-  const offset = (page - 1) * limit;
-
-  // Get primary image for each product+color from productImages table
-  const imagesSubquery = db
-    .select({
-      productId: productImages.productId,
-      colorId: productImages.colorId,
-      url: productImages.url,
-      rn: sql<number>`row_number() over (partition by ${productImages.productId}, ${productImages.colorId} order by ${productImages.isPrimary} desc)`.as(
-        "rn",
-      ),
-    })
-    .from(productImages)
-    .as("img");
-
-  let orderByClause;
-  if (filters.sort === "price_asc") {
-    orderByClause = [
-      asc(
-        sql`COALESCE(${productVariants.salePrice}, ${productVariants.price})`,
-      ),
-      desc(products.createdAt),
-      asc(productVariants.id),
-    ];
-  } else if (filters.sort === "price_desc") {
-    orderByClause = [
-      desc(
-        sql`COALESCE(${productVariants.salePrice}, ${productVariants.price})`,
-      ),
-      desc(products.createdAt),
-      asc(productVariants.id),
-    ];
-  } else {
-    orderByClause = [desc(products.createdAt), asc(productVariants.id)];
+    conditions.push(or(...priceConds)!);
   }
 
   const rows = await db
     .select({
-      variantId: productVariants.id,
       productId: products.id,
       productName: products.name,
-      sku: productVariants.sku,
-      price: sql<number>`${productVariants.price}::numeric`,
-      salePrice: sql<number | null>`${productVariants.salePrice}::numeric`,
+      colorId: colors.id,
       colorName: colors.name,
-      sizeName: sizes.name,
-      genderLabel: genders.label,
-      createdAt: products.createdAt,
-      imageUrl: sql<
-        string | null
-      >`MAX(CASE WHEN ${imagesSubquery.rn} = 1 THEN ${imagesSubquery.url} END)`,
-    })
-    .from(productVariants)
-    .innerJoin(products, eq(products.id, productVariants.productId))
-    .leftJoin(colors, eq(colors.id, productVariants.colorId))
-    .leftJoin(sizes, eq(sizes.id, productVariants.sizeId))
-    .leftJoin(genders, eq(genders.id, products.genderId))
-    .leftJoin(brands, eq(brands.id, products.brandId))
-    .leftJoin(categories, eq(categories.id, products.categoryId))
-    .leftJoin(
-      imagesSubquery,
-      and(
-        eq(imagesSubquery.productId, products.id),
-        eq(imagesSubquery.colorId, productVariants.colorId),
-        eq(imagesSubquery.rn, 1),
+      colorSlug: colors.slug,
+      colorHex: colors.hexCode,
+      price: sql<number>`MIN(${productVariants.price}::numeric)`.as(
+        "min_price",
       ),
-    )
-    .where(and(baseWhere, variantWhere))
+      salePrice: sql<
+        number | null
+      >`MIN(${productVariants.salePrice}::numeric)`.as("min_sale_price"),
+      image: sql<string>`(
+        SELECT ${productImages.url}
+        FROM ${productImages}
+        WHERE ${productImages.productId} = ${products.id}
+          AND ${productImages.colorId} = ${colors.id}
+        ORDER BY ${productImages.sortOrder}
+        LIMIT 1
+      )`.as("primary_image"),
+    })
+    .from(products)
+    .innerJoin(productVariants, eq(products.id, productVariants.productId))
+    .innerJoin(colors, eq(productVariants.colorId, colors.id))
+    .leftJoin(genders, eq(genders.id, products.genderId))
+    .where(and(...conditions))
     .groupBy(
-      productVariants.id,
       products.id,
       products.name,
-      productVariants.sku,
-      productVariants.price,
-      productVariants.salePrice,
+      colors.id,
       colors.name,
-      sizes.name,
-      genders.label,
-      products.createdAt,
+      colors.slug,
+      colors.hexCode,
     )
-    .orderBy(...orderByClause)
+    .orderBy(products.name)
     .limit(limit)
     .offset(offset);
 
-  const countRows = await db
+  // Count for pagination
+  const countResult = await db
     .select({
-      cnt: count(productVariants.id),
+      total: sql<number>`COUNT(DISTINCT ${products.id} || '-' || ${colors.id})`,
     })
-    .from(productVariants)
-    .innerJoin(products, eq(products.id, productVariants.productId))
+    .from(products)
+    .innerJoin(productVariants, eq(products.id, productVariants.productId))
+    .innerJoin(colors, eq(productVariants.colorId, colors.id))
     .leftJoin(genders, eq(genders.id, products.genderId))
-    .leftJoin(brands, eq(brands.id, products.brandId))
-    .leftJoin(categories, eq(categories.id, products.categoryId))
-    .leftJoin(colors, eq(colors.id, productVariants.colorId))
-    .leftJoin(sizes, eq(sizes.id, productVariants.sizeId))
-    .where(and(baseWhere, variantWhere));
+    .where(and(...conditions));
 
-  const variantsOut: VariantListItem[] = rows.map((r) => ({
-    id: r.variantId,
-    productId: r.productId,
-    productName: r.productName,
-    sku: r.sku,
-    imageUrl: r.imageUrl,
-    price: Number(r.price),
-    salePrice: r.salePrice !== null ? Number(r.salePrice) : null,
-    colorName: r.colorName,
-    sizeName: r.sizeName,
-    createdAt: r.createdAt,
-    subtitle: r.genderLabel ? `${r.genderLabel} Shoes` : null,
-  }));
-
-  const totalCount = countRows[0]?.cnt ?? 0;
-
-  return { variants: variantsOut, totalCount };
-}
+  return {
+    data: rows,
+    total: countResult[0]?.total ?? 0,
+    page,
+    limit,
+  };
+};
 
 export async function getAllProductVariants(productId: string) {
   const rows = await db
@@ -563,703 +329,10 @@ export async function getAllProductVariants(productId: string) {
   }));
 }
 
-export async function getProductsForAdmin(): Promise<ProductListItem[]> {
-  const rows = await db
-    .select({
-      id: products.id,
-      name: products.name,
-      createdAt: products.createdAt,
-      subtitle: genders.label,
-      minPrice: sql<number | null>`min(${productVariants.price})`,
-      maxPrice: sql<number | null>`max(${productVariants.price})`,
-    })
-    .from(products)
-    .leftJoin(productVariants, eq(productVariants.productId, products.id))
-    .leftJoin(genders, eq(genders.id, products.genderId))
-    .groupBy(products.id, products.name, products.createdAt, genders.label)
-    .orderBy(desc(products.createdAt), asc(products.id));
-
-  return rows.map((r) => ({
-    id: r.id,
-    name: r.name,
-    imageUrl: null,
-    minPrice: r.minPrice === null ? null : Number(r.minPrice),
-    maxPrice: r.maxPrice === null ? null : Number(r.maxPrice),
-    createdAt: r.createdAt,
-    subtitle: r.subtitle ? `${r.subtitle} Shoes` : null,
-  }));
-}
-
-export async function getLatestProducts(
-  limit: number,
-): Promise<ProductListItem[]> {
-  const imagesJoin = db
-    .select({
-      productId: productImages.productId,
-      colorId: productImages.colorId,
-      url: productImages.url,
-      rn: sql<number>`row_number() over (partition by ${productImages.productId}, ${productImages.colorId} order by ${productImages.isPrimary} desc, ${productImages.sortOrder} asc)`.as(
-        "rn",
-      ),
-      globalRn:
-        sql<number>`row_number() over (partition by ${productImages.productId} order by ${productImages.isPrimary} desc, ${productImages.sortOrder} asc)`.as(
-          "global_rn",
-        ),
-    })
-    .from(productImages)
-    .as("pi");
-
-  // Create alias for default variant to get its color
-  const defaultVar = db.$with("default_var").as(
-    db
-      .select({
-        productId: productVariants.productId,
-        colorId: productVariants.colorId,
-      })
-      .from(productVariants)
-      .innerJoin(products, eq(products.defaultVariantId, productVariants.id)),
-  );
-
-  const rows = await db
-    .with(defaultVar)
-    .select({
-      id: products.id,
-      name: products.name,
-      createdAt: products.createdAt,
-      minPrice: sql<number | null>`min(${productVariants.price}::numeric)`,
-      imageUrl: sql<string | null>`
-        max(
-          case 
-            when ${imagesJoin.rn} = 1 then ${imagesJoin.url}
-            when ${imagesJoin.globalRn} = 1 then ${imagesJoin.url}
-            else null 
-          end
-        )
-      `,
-    })
-    .from(products)
-    .leftJoin(productVariants, eq(productVariants.productId, products.id))
-    .leftJoin(defaultVar, eq(defaultVar.productId, products.id))
-    .leftJoin(
-      imagesJoin,
-      and(
-        eq(imagesJoin.productId, products.id),
-        or(
-          eq(imagesJoin.colorId, defaultVar.colorId),
-          sql`${defaultVar.colorId} IS NULL`,
-        ),
-      ),
-    )
-    .where(eq(products.isPublished, true))
-    .groupBy(products.id, products.name, products.createdAt)
-    .orderBy(desc(products.createdAt), asc(products.id))
-    .limit(limit);
-
-  return rows.map((r) => ({
-    id: r.id,
-    name: r.name,
-    imageUrl: r.imageUrl,
-    minPrice: r.minPrice === null ? null : Number(r.minPrice),
-    maxPrice: r.minPrice === null ? null : Number(r.minPrice),
-    createdAt: r.createdAt,
-  }));
-}
-
-export async function getLatestVariants(
-  limit: number,
-): Promise<VariantListItem[]> {
-  const imagesSubquery = db
-    .select({
-      productId: productImages.productId,
-      colorId: productImages.colorId,
-      url: productImages.url,
-      rn: sql<number>`row_number() over (partition by ${productImages.productId}, ${productImages.colorId} order by ${productImages.isPrimary} desc)`.as(
-        "rn",
-      ),
-    })
-    .from(productImages)
-    .as("img");
-
-  const rows = await db
-    .select({
-      variantId: productVariants.id,
-      productId: products.id,
-      productName: products.name,
-      sku: productVariants.sku,
-      price: sql<number>`${productVariants.price}::numeric`,
-      salePrice: sql<number | null>`${productVariants.salePrice}::numeric`,
-      colorName: colors.name,
-      sizeName: sizes.name,
-      genderLabel: genders.label,
-      createdAt: products.createdAt,
-      imageUrl: sql<
-        string | null
-      >`MAX(CASE WHEN ${imagesSubquery.rn} = 1 THEN ${imagesSubquery.url} END)`,
-    })
-    .from(productVariants)
-    .innerJoin(products, eq(products.id, productVariants.productId))
-    .leftJoin(colors, eq(colors.id, productVariants.colorId))
-    .leftJoin(sizes, eq(sizes.id, productVariants.sizeId))
-    .leftJoin(genders, eq(genders.id, products.genderId))
-    .leftJoin(
-      imagesSubquery,
-      and(
-        eq(imagesSubquery.productId, products.id),
-        eq(imagesSubquery.colorId, productVariants.colorId),
-        eq(imagesSubquery.rn, 1),
-      ),
-    )
-    .where(eq(products.isPublished, true))
-    .groupBy(
-      productVariants.id,
-      products.id,
-      products.name,
-      productVariants.sku,
-      productVariants.price,
-      productVariants.salePrice,
-      colors.name,
-      sizes.name,
-      genders.label,
-      products.createdAt,
-    )
-    .orderBy(desc(products.createdAt), asc(productVariants.id))
-    .limit(limit);
-
-  return rows.map((r) => ({
-    id: r.variantId,
-    productId: r.productId,
-    productName: r.productName,
-    sku: r.sku,
-    imageUrl: r.imageUrl,
-    price: Number(r.price),
-    salePrice: r.salePrice !== null ? Number(r.salePrice) : null,
-    colorName: r.colorName,
-    sizeName: r.sizeName,
-    createdAt: r.createdAt,
-    subtitle: r.genderLabel ? `${r.genderLabel} Shoes` : null,
-  }));
-}
-
-export type FullProduct = {
-  product: SelectProduct & {
-    brand?: SelectBrand | null;
-    category?: SelectCategory | null;
-    gender?: SelectGender | null;
-  };
-  variants: Array<
-    SelectVariant & {
-      color?: SelectColor | null;
-      size?: SelectSize | null;
-    }
-  >;
-  images: SelectProductImage[];
-};
-
-export async function getProduct(
+export const getProductDetails = async (
   productId: string,
-): Promise<FullProduct | null> {
-  const rows = await db
-    .select({
-      productId: products.id,
-      productName: products.name,
-      productDescription: products.description,
-      productBrandId: products.brandId,
-      productCategoryId: products.categoryId,
-      productGenderId: products.genderId,
-      isPublished: products.isPublished,
-      defaultVariantId: products.defaultVariantId,
-      productCreatedAt: products.createdAt,
-      productUpdatedAt: products.updatedAt,
-
-      brandId: brands.id,
-      brandName: brands.name,
-      brandSlug: brands.slug,
-      brandLogoUrl: brands.logoUrl,
-
-      categoryId: categories.id,
-      categoryName: categories.name,
-      categorySlug: categories.slug,
-
-      genderId: genders.id,
-      genderLabel: genders.label,
-      genderSlug: genders.slug,
-
-      variantId: productVariants.id,
-      variantSku: productVariants.sku,
-      variantPrice: sql<number | null>`${productVariants.price}::numeric`,
-      variantSalePrice: sql<
-        number | null
-      >`${productVariants.salePrice}::numeric`,
-      variantColorId: productVariants.colorId,
-      variantSizeId: productVariants.sizeId,
-      variantInStock: productVariants.inStock,
-
-      colorId: colors.id,
-      colorName: colors.name,
-      colorSlug: colors.slug,
-      colorHex: colors.hexCode,
-
-      sizeId: sizes.id,
-      sizeName: sizes.name,
-      sizeSlug: sizes.slug,
-      sizeSortOrder: sizes.sortOrder,
-
-      imageId: productImages.id,
-      imageUrl: productImages.url,
-      imageIsPrimary: productImages.isPrimary,
-      imageSortOrder: productImages.sortOrder,
-      imageProductId: productImages.productId,
-      imageColorId: productImages.colorId,
-      imageCreatedAt: productImages.createdAt,
-    })
-    .from(products)
-    .leftJoin(brands, eq(brands.id, products.brandId))
-    .leftJoin(categories, eq(categories.id, products.categoryId))
-    .leftJoin(genders, eq(genders.id, products.genderId))
-    .leftJoin(productVariants, eq(productVariants.productId, products.id))
-    .leftJoin(colors, eq(colors.id, productVariants.colorId))
-    .leftJoin(sizes, eq(sizes.id, productVariants.sizeId))
-    .leftJoin(
-      productImages,
-      and(
-        eq(productImages.productId, products.id),
-        eq(productImages.colorId, productVariants.colorId),
-      ),
-    )
-    .where(eq(products.id, productId));
-
-  if (!rows.length) return null;
-
-  const head = rows[0];
-
-  const product: SelectProduct & {
-    brand?: SelectBrand | null;
-    category?: SelectCategory | null;
-    gender?: SelectGender | null;
-  } = {
-    id: head.productId,
-    name: head.productName,
-    description: head.productDescription,
-    brandId: head.productBrandId ?? null,
-    categoryId: head.productCategoryId ?? null,
-    genderId: head.productGenderId ?? null,
-    isPublished: head.isPublished,
-    defaultVariantId: head.defaultVariantId ?? null,
-    createdAt: head.productCreatedAt,
-    updatedAt: head.productUpdatedAt,
-    brand: head.brandId
-      ? {
-          id: head.brandId,
-          name: head.brandName!,
-          slug: head.brandSlug!,
-          logoUrl: head.brandLogoUrl ?? null,
-        }
-      : null,
-    category: head.categoryId
-      ? {
-          id: head.categoryId,
-          name: head.categoryName!,
-          slug: head.categorySlug!,
-          parentId: null,
-        }
-      : null,
-    gender: head.genderId
-      ? {
-          id: head.genderId,
-          label: head.genderLabel!,
-          slug: head.genderSlug!,
-        }
-      : null,
-  };
-
-  const variantsMap = new Map<string, FullProduct["variants"][number]>();
-  const imagesMap = new Map<string, SelectProductImage>();
-
-  for (const r of rows) {
-    if (r.variantId && !variantsMap.has(r.variantId)) {
-      variantsMap.set(r.variantId, {
-        id: r.variantId,
-        productId: head.productId,
-        sku: r.variantSku!,
-        price: r.variantPrice !== null ? String(r.variantPrice) : "0",
-        salePrice:
-          r.variantSalePrice !== null ? String(r.variantSalePrice) : null,
-        colorId: r.variantColorId!,
-        sizeId: r.variantSizeId!,
-        inStock: r.variantInStock!,
-        weight: null,
-        dimensions: null,
-        createdAt: head.productCreatedAt,
-        color: r.colorId
-          ? {
-              id: r.colorId,
-              name: r.colorName!,
-              slug: r.colorSlug!,
-              hexCode: r.colorHex!,
-            }
-          : null,
-        size: r.sizeId
-          ? {
-              id: r.sizeId,
-              name: r.sizeName!,
-              slug: r.sizeSlug!,
-              sortOrder: r.sizeSortOrder!,
-            }
-          : null,
-      });
-    }
-    if (r.imageId && !imagesMap.has(r.imageId)) {
-      imagesMap.set(r.imageId, {
-        id: r.imageId,
-        productId: head.productId,
-        colorId: r.imageColorId!,
-        url: r.imageUrl!,
-        sortOrder: r.imageSortOrder ?? 0,
-        isPrimary: r.imageIsPrimary ?? false,
-        createdAt: r.imageCreatedAt!,
-      });
-    }
-  }
-
-  return {
-    product,
-    variants: Array.from(variantsMap.values()),
-    images: Array.from(imagesMap.values()),
-  };
-}
-
-/**
- * Get product data by variant ID
- *
- * This function is used by the product detail page (/products/[id])
- * where [id] is actually a variant ID.
- *
- * Flow:
- * 1. Takes a variant ID as input
- * 2. Looks up the parent product ID from the variant
- * 3. Returns the full product with all its variants and images
- *
- * This allows the detail page to:
- * - Show the full product information
- * - Display all available variants (different colors/sizes)
- * - Allow users to switch between variants
- *
- * @param variantId - The UUID of the product variant (SKU)
- * @returns Full product data with all variants, or null if not found
- */
-export async function getProductByVariantId(
-  variantId: string,
-): Promise<FullProduct | null> {
-  // First, get the product ID from the variant
-  const variantRow = await db
-    .select({ productId: productVariants.productId })
-    .from(productVariants)
-    .where(eq(productVariants.id, variantId))
-    .limit(1);
-
-  if (!variantRow.length) return null;
-
-  // Then get the full product data using the product ID
-  return getProduct(variantRow[0].productId);
-}
-
-export type Review = {
-  id: string;
-  author: string;
-  rating: number;
-  title?: string;
-  content: string;
-  createdAt: string;
-};
-
-export type RecommendedProduct = {
-  id: string; // This will be the variant ID (defaultVariantId)
-  productId: string;
-  title: string;
-  price: number | null;
-  imageUrl: string;
-};
-
-export async function getProductReviews(productId: string): Promise<Review[]> {
-  const rows = await db
-    .select({
-      id: reviews.id,
-      rating: reviews.rating,
-      comment: reviews.comment,
-      createdAt: reviews.createdAt,
-      authorName: users.name,
-      authorEmail: users.email,
-    })
-    .from(reviews)
-    .innerJoin(users, eq(users.id, reviews.userId))
-    .where(eq(reviews.productId, productId))
-    .orderBy(desc(reviews.createdAt))
-    .limit(10);
-
-  return rows.map((r) => ({
-    id: r.id,
-    author: r.authorName?.trim() || r.authorEmail || "Anonymous",
-    rating: r.rating,
-    title: undefined,
-    content: r.comment || "",
-    createdAt: r.createdAt.toISOString(),
-  }));
-}
-
-export async function getRecommendedProducts(
-  productId: string,
-): Promise<RecommendedProduct[]> {
-  const base = await db
-    .select({
-      id: products.id,
-      categoryId: products.categoryId,
-      brandId: products.brandId,
-      genderId: products.genderId,
-    })
-    .from(products)
-    .where(eq(products.id, productId))
-    .limit(1);
-
-  if (!base.length) return [];
-  const b = base[0];
-
-  const v = db
-    .select({
-      productId: productVariants.productId,
-      price: sql<number>`${productVariants.price}::numeric`.as("price"),
-    })
-    .from(productVariants)
-    .as("v");
-
-  const pi = db
-    .select({
-      productId: productImages.productId,
-      colorId: productImages.colorId,
-      url: productImages.url,
-      rn: sql<number>`row_number() over (partition by ${productImages.productId}, ${productImages.colorId} order by ${productImages.isPrimary} desc)`.as(
-        "rn",
-      ),
-    })
-    .from(productImages)
-    .as("pi");
-
-  const priority = sql<number>`
-    (case when ${products.categoryId} is not null and ${products.categoryId} = ${b.categoryId} then 1 else 0 end) * 3 +
-    (case when ${products.brandId} is not null and ${products.brandId} = ${b.brandId} then 1 else 0 end) * 2 +
-    (case when ${products.genderId} is not null and ${products.genderId} = ${b.genderId} then 1 else 0 end) * 1
-  `;
-
-  // Get default variant to find its color for images
-  const defaultVariant = db
-    .select({
-      id: productVariants.id,
-      productId: productVariants.productId,
-      colorId: productVariants.colorId,
-    })
-    .from(productVariants)
-    .as("default_variant");
-
-  const rows = await db
-    .select({
-      productId: products.id,
-      defaultVariantId: products.defaultVariantId,
-      title: products.name,
-      minPrice: sql<number | null>`min(${v.price})`,
-      imageUrl: sql<
-        string | null
-      >`max(case when ${pi.rn} = 1 then ${pi.url} else null end)`,
-      createdAt: products.createdAt,
-    })
-    .from(products)
-    .leftJoin(v, eq(v.productId, products.id))
-    .leftJoin(defaultVariant, eq(defaultVariant.id, products.defaultVariantId))
-    .leftJoin(
-      pi,
-      and(
-        eq(pi.productId, products.id),
-        eq(pi.colorId, defaultVariant.colorId),
-        eq(pi.rn, 1),
-      ),
-    )
-    .where(
-      and(eq(products.isPublished, true), sql`${products.id} <> ${productId}`),
-    )
-    .groupBy(
-      products.id,
-      products.defaultVariantId,
-      products.name,
-      products.createdAt,
-    )
-    .orderBy(desc(priority), desc(products.createdAt), asc(products.id))
-    .limit(8);
-
-  const out: RecommendedProduct[] = [];
-  for (const r of rows) {
-    const img = r.imageUrl?.trim();
-    if (!img || !r.defaultVariantId) continue;
-    out.push({
-      id: r.defaultVariantId,
-      productId: r.productId,
-      title: r.title,
-      price: r.minPrice === null ? null : Number(r.minPrice),
-      imageUrl: img,
-    });
-    if (out.length >= 6) break;
-  }
-  return out;
-}
-
-// Get products with their color variants
-export const testQuery = async () => {
-  // Get basic product info
-  const productsList = await db
-    .select({
-      id: products.id,
-      name: products.name,
-      categoryId: products.categoryId,
-      brandId: products.brandId,
-      basePrice: sql<string>`MIN(${productVariants.price})`,
-      salePrice: sql<string>`MIN(${productVariants.salePrice})`,
-      hasStock: sql<boolean>`BOOL_OR(${productVariants.inStock} > 0)`,
-    })
-    .from(products)
-    .leftJoin(productVariants, eq(products.id, productVariants.productId))
-    .where(
-      and(
-        eq(products.isPublished, true),
-        eq(productVariants.isActive, true),
-        eq(productVariants.isDeleted, false),
-      ),
-    )
-    .groupBy(products.id)
-    .limit(20);
-
-  const productIds = productsList.map((p) => p.id);
-
-  // Get colors for these products
-  const colorsData = await db
-    .selectDistinct({
-      productId: productVariants.productId,
-      colorId: colors.id,
-      colorName: colors.name,
-      colorHex: colors.hexCode,
-    })
-    .from(productVariants)
-    .innerJoin(colors, eq(productVariants.colorId, colors.id))
-    .where(
-      and(
-        inArray(productVariants.productId, productIds),
-        eq(productVariants.isActive, true),
-        eq(productVariants.isDeleted, false),
-      ),
-    );
-
-  // Get primary images
-  const imagesData = await db
-    .select({
-      productId: productImages.productId,
-      colorId: productImages.colorId,
-      url: productImages.url,
-      sortOrder: productImages.sortOrder,
-    })
-    .from(productImages)
-    .where(
-      and(
-        inArray(productImages.productId, productIds),
-        eq(productImages.isPrimary, true),
-      ),
-    )
-    .orderBy(productImages.sortOrder);
-
-  // Combine the data
-  const result = productsList.map((product) => ({
-    ...product,
-    colors: colorsData
-      .filter((c) => c.productId === product.id)
-      .map((c) => ({
-        id: c.colorId,
-        name: c.colorName,
-        hex: c.colorHex,
-      })),
-    images: imagesData
-      .filter((img) => img.productId === product.id)
-      .map((img) => ({
-        colorId: img.colorId,
-        url: img.url,
-      })),
-  }));
-  console.log("Result: ", result);
-  return result;
-};
-
-// export const testQuery2 = async (productId: string) => {
-//   try {
-//     // Get full product details with all variants
-//     const productDetails = await db.query.products.findFirst({
-//       where: eq(products.id, productId),
-//       with: {
-//         category: true,
-//         brand: true,
-//         gender: true,
-//         images: {
-//           orderBy: [asc(productImages.sortOrder)],
-//         },
-//       },
-//     });
-
-//     // Get all variants grouped by color
-//     const variants = await db
-//       .select({
-//         colorId: colors.id,
-//         colorName: colors.name,
-//         colorHex: colors.hexCode,
-//         sizes: sql<
-//           Array<{
-//             id: string;
-//             name: string;
-//             price: string;
-//             salePrice: string | null;
-//             inStock: number;
-//             variantId: string;
-//             sku: string;
-//           }>
-//         >`
-//       JSON_AGG(
-//         JSON_BUILD_OBJECT(
-//           'id', ${sizes.id},
-//           'name', ${sizes.name},
-//           'price', ${productVariants.price},
-//           'salePrice', ${productVariants.salePrice},
-//           'inStock', ${productVariants.inStock},
-//           'variantId', ${productVariants.id},
-//           'sku', ${productVariants.sku}
-//         ) ORDER BY ${sizes.sortOrder}
-//       )
-//     `.as("sizes"),
-//       })
-//       .from(productVariants)
-//       .innerJoin(colors, eq(productVariants.colorId, colors.id))
-//       .innerJoin(sizes, eq(productVariants.sizeId, sizes.id))
-//       .where(
-//         and(
-//           eq(productVariants.productId, productId),
-//           eq(productVariants.isActive, true),
-//           eq(productVariants.isDeleted, false),
-//         ),
-//       )
-//       .groupBy(colors.id, colors.name, colors.hexCode);
-
-//     return {
-//       product: productDetails,
-//       variants,
-//     };
-//   } catch (error) {
-//     console.error("Error in testQuery2:", error);
-//   }
-// };
-
-
-export const getProductDetails = async (productId: string, colorSlug?: string) => {
+  colorSlug?: string,
+) => {
   try {
     // Get full product details
     const productDetails = await db.query.products.findFirst({
@@ -1289,14 +362,14 @@ export const getProductDetails = async (productId: string, colorSlug?: string) =
         and(
           eq(productVariants.productId, productId),
           eq(productVariants.isActive, true),
-          eq(productVariants.isDeleted, false)
-        )
+          eq(productVariants.isDeleted, false),
+        ),
       );
 
     // Determine which color to show
     let selectedColor;
     if (colorSlug) {
-      selectedColor = availableColors.find(c => c.slug === colorSlug);
+      selectedColor = availableColors.find((c) => c.slug === colorSlug);
     }
     // If no color specified or invalid color, use first available
     if (!selectedColor && availableColors.length > 0) {
@@ -1335,8 +408,8 @@ export const getProductDetails = async (productId: string, colorSlug?: string) =
           eq(productVariants.productId, productId),
           eq(productVariants.colorId, selectedColor.id),
           eq(productVariants.isActive, true),
-          eq(productVariants.isDeleted, false)
-        )
+          eq(productVariants.isDeleted, false),
+        ),
       )
       .orderBy(asc(sizes.sortOrder));
 
@@ -1344,7 +417,7 @@ export const getProductDetails = async (productId: string, colorSlug?: string) =
     const images = await db.query.productImages.findMany({
       where: and(
         eq(productImages.productId, productId),
-        eq(productImages.colorId, selectedColor.id)
+        eq(productImages.colorId, selectedColor.id),
       ),
       orderBy: [asc(productImages.sortOrder)],
     });
@@ -1360,4 +433,50 @@ export const getProductDetails = async (productId: string, colorSlug?: string) =
     console.error("Error in getProductDetails:", error);
     throw error;
   }
+};
+
+export const getProductsForListing = async () => {
+  // Get all products with their first two color variants
+  const productsWithColors = await db
+    .select({
+      productId: products.id,
+      productName: products.name,
+      colorId: colors.id,
+      colorName: colors.name,
+      colorSlug: colors.slug,
+      colorHex: colors.hexCode,
+      price: sql<string>`MIN(${productVariants.price})`.as("min_price"),
+      salePrice: sql<string | null>`MIN(${productVariants.salePrice})`.as(
+        "min_sale_price",
+      ),
+      image: sql<string>`(
+        SELECT ${productImages.url}
+        FROM ${productImages}
+        WHERE ${productImages.productId} = ${products.id}
+          AND ${productImages.colorId} = ${colors.id}
+        ORDER BY ${productImages.sortOrder}
+        LIMIT 1
+      )`.as("primary_image"),
+    })
+    .from(products)
+    .innerJoin(productVariants, eq(products.id, productVariants.productId))
+    .innerJoin(colors, eq(productVariants.colorId, colors.id))
+    .where(
+      and(
+        eq(products.isPublished, true),
+        eq(productVariants.isActive, true),
+        eq(productVariants.isDeleted, false),
+      ),
+    )
+    .groupBy(
+      products.id,
+      products.name,
+      colors.id,
+      colors.name,
+      colors.slug,
+      colors.hexCode,
+    )
+    .orderBy(products.name);
+
+  return productsWithColors;
 };
