@@ -27,11 +27,6 @@ const navItems = [
     icon: Package,
   },
   {
-    name: "Listings",
-    href: "/admin/listings",
-    icon: Package,
-  },
-  {
     name: "Variants / SKUs",
     href: "/admin/variants",
     icon: Palette,

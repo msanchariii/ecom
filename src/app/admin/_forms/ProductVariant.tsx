@@ -7,6 +7,8 @@ import { useForm } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
+import { Check } from "lucide-react";
+import Image from "next/image";
 import {
   getProducts,
   getProductImages,
@@ -14,6 +16,13 @@ import {
 } from "../_actions/products";
 import { getColors, getSizes } from "../_actions/filters";
 import { addVariant, updateVariant } from "../_actions/variants";
+
+type ProductColor = {
+  id: string;
+  name: string;
+  hexCode: string;
+  primaryImageUrl: string | null;
+};
 
 interface ProductVariantFormProps {
   variant?: {
@@ -41,20 +50,23 @@ const ProductVariantForm = ({ variant }: ProductVariantFormProps) => {
   const [products, setProducts] = useState<Array<{ id: string; name: string }>>(
     [],
   );
-  const [colors, setColors] = useState<
+  const [allColors, setAllColors] = useState<
     Array<{ id: string; name: string; hexCode: string }>
   >([]);
+  const [availableColors, setAvailableColors] = useState<ProductColor[]>([]);
   const [sizes, setSizes] = useState<Array<{ id: string; name: string }>>([]);
   const [imagesExistForColor, setImagesExistForColor] =
     useState<boolean>(false);
   const [selectedProductName, setSelectedProductName] = useState<string>("");
   const [selectedColorName, setSelectedColorName] = useState<string>("");
+  const [isLoadingColors, setIsLoadingColors] = useState<boolean>(false);
 
   const {
     register,
     handleSubmit,
     formState: { errors, isSubmitting },
     watch,
+    setValue,
   } = useForm<InsertVariant>({
     resolver: zodResolver(insertVariantSchema),
     defaultValues: {
@@ -81,7 +93,7 @@ const ProductVariantForm = ({ variant }: ProductVariantFormProps) => {
       setSelectedProductName(selectedProduct?.name || "");
 
       // Update selected color name
-      const selectedColor = colors.find((c) => c.id === colorId);
+      const selectedColor = availableColors.find((c) => c.id === colorId);
       setSelectedColorName(selectedColor?.name || "");
 
       if (productId && colorId) {
@@ -97,7 +109,55 @@ const ProductVariantForm = ({ variant }: ProductVariantFormProps) => {
       }
     };
     checkImages();
-  }, [watch("productId"), watch("colorId"), products, colors]);
+  }, [watch("productId"), watch("colorId"), products, availableColors]);
+
+  // Load available colors when product is selected
+  useEffect(() => {
+    const loadAvailableColors = async () => {
+      const productId = watch("productId");
+      if (!productId || allColors.length === 0) {
+        setAvailableColors([]);
+        return;
+      }
+
+      setIsLoadingColors(true);
+      try {
+        const colorsWithImages: ProductColor[] = [];
+
+        for (const color of allColors) {
+          const images = await getProductImages(productId, color.id);
+          if (images.length > 0) {
+            const primaryImage =
+              images.find((img) => img.isPrimary) || images[0];
+            colorsWithImages.push({
+              id: color.id,
+              name: color.name,
+              hexCode: color.hexCode,
+              primaryImageUrl: primaryImage.url,
+            });
+          }
+        }
+
+        setAvailableColors(colorsWithImages);
+
+        // Reset color selection if current color is not available for new product
+        const currentColorId = watch("colorId");
+        if (
+          currentColorId &&
+          !colorsWithImages.find((c) => c.id === currentColorId)
+        ) {
+          setValue("colorId", "");
+        }
+      } catch (error) {
+        console.error("Failed to load available colors:", error);
+        toast.error("Failed to load available colors");
+      } finally {
+        setIsLoadingColors(false);
+      }
+    };
+
+    loadAvailableColors();
+  }, [watch("productId"), allColors, setValue]);
 
   // Fetch dropdown data
   useEffect(() => {
@@ -109,7 +169,7 @@ const ProductVariantForm = ({ variant }: ProductVariantFormProps) => {
           getSizes(),
         ]);
         setProducts(productsData.map((p) => ({ id: p.id, name: p.name })));
-        setColors(colorsData);
+        setAllColors(colorsData);
         setSizes(sizesData);
       } catch (error) {
         console.error("Failed to fetch data:", error);
@@ -124,15 +184,15 @@ const ProductVariantForm = ({ variant }: ProductVariantFormProps) => {
       // Validate that images exist for this product+color combination
       if (!imagesExistForColor) {
         toast.error(
-          `Please add images for ${selectedColorName || "this"} color in Product Listing first.`,
-          { duration: 5000 }
+          `Please add images for ${selectedColorName || "this"} color in Product form first.`,
+          { duration: 5000 },
         );
         return;
       }
 
       // Show loading toast
       const loadingToast = toast.loading(
-        variant ? "Updating variant..." : "Creating variant..."
+        variant ? "Updating variant..." : "Creating variant...",
       );
 
       // Prepare variant data
@@ -154,7 +214,7 @@ const ProductVariantForm = ({ variant }: ProductVariantFormProps) => {
         variant
           ? "Variant updated successfully"
           : "Variant created successfully",
-        { id: loadingToast }
+        { id: loadingToast },
       );
 
       // Redirect to variants page
@@ -164,7 +224,7 @@ const ProductVariantForm = ({ variant }: ProductVariantFormProps) => {
     } catch (error) {
       console.error("Failed to save variant:", error);
       toast.error(
-        variant ? "Failed to update variant" : "Failed to create variant"
+        variant ? "Failed to update variant" : "Failed to create variant",
       );
     }
   };
@@ -264,30 +324,81 @@ const ProductVariantForm = ({ variant }: ProductVariantFormProps) => {
           <label htmlFor="colorId" className="block text-sm font-medium">
             Color <span className="text-red-500">*</span>
           </label>
-          <div className="flex gap-2">
-            <select
-              id="colorId"
-              {...register("colorId")}
-              className="flex-1 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-            >
-              <option value="">Select a color</option>
-              {colors.map((color) => (
-                <option key={color.id} value={color.id}>
-                  {color.name}
-                </option>
+          {!watch("productId") ? (
+            <div className="flex items-center justify-center h-20 border-2 border-dashed border-gray-300 rounded-md bg-gray-50">
+              <p className="text-sm text-gray-500">
+                Please select a product first
+              </p>
+            </div>
+          ) : isLoadingColors ? (
+            <div className="flex items-center justify-center h-20 border-2 border-dashed border-gray-300 rounded-md bg-gray-50">
+              <p className="text-sm text-gray-500">
+                Loading available colors...
+              </p>
+            </div>
+          ) : availableColors.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-20 border-2 border-dashed border-gray-300 rounded-md bg-gray-50">
+              <p className="text-sm text-gray-500 text-center px-4">
+                No colors with images available for this product
+              </p>
+              <p className="text-xs text-gray-400 mt-1">
+                Add images in Product form first
+              </p>
+            </div>
+          ) : (
+            <div className="border border-gray-300 rounded-md p-3 max-h-80 overflow-y-auto space-y-2">
+              {availableColors.map((color) => (
+                <label
+                  key={color.id}
+                  className={`flex items-center gap-3 p-2 rounded-lg cursor-pointer transition-all ${
+                    watch("colorId") === color.id
+                      ? "bg-blue-50 border-2 border-blue-500"
+                      : "hover:bg-gray-50 border-2 border-transparent"
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    value={color.id}
+                    {...register("colorId")}
+                    className="sr-only"
+                  />
+                  <div className="relative shrink-0">
+                    {color.primaryImageUrl ? (
+                      <Image
+                        src={color.primaryImageUrl}
+                        alt={color.name}
+                        width={48}
+                        height={48}
+                        className="w-12 h-12 object-cover rounded-md border border-gray-200"
+                      />
+                    ) : (
+                      <div
+                        className="w-12 h-12 rounded-md border border-gray-200"
+                        style={{ backgroundColor: color.hexCode }}
+                      />
+                    )}
+                    {watch("colorId") === color.id && (
+                      <div className="absolute -top-1 -right-1 bg-blue-500 text-white rounded-full p-0.5">
+                        <Check size={12} />
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex-1">
+                    <p className="font-medium text-sm">{color.name}</p>
+                    <div className="flex items-center gap-2 mt-1">
+                      <div
+                        className="w-4 h-4 rounded-sm border border-gray-300"
+                        style={{ backgroundColor: color.hexCode }}
+                      />
+                      <span className="text-xs text-gray-500">
+                        {color.hexCode}
+                      </span>
+                    </div>
+                  </div>
+                </label>
               ))}
-            </select>
-            {watch("colorId") && (
-              <div
-                className="w-10 h-10 rounded-md border border-gray-300"
-                style={{
-                  backgroundColor:
-                    colors.find((c) => c.id === watch("colorId"))?.hexCode ||
-                    "#fff",
-                }}
-              />
-            )}
-          </div>
+            </div>
+          )}
           {errors.colorId && (
             <p className="text-sm text-red-500">{errors.colorId.message}</p>
           )}
@@ -434,8 +545,8 @@ const ProductVariantForm = ({ variant }: ProductVariantFormProps) => {
                     Images Available
                   </p>
                   <p className="text-sm text-green-700 mt-1">
-                    Images exist for {selectedProductName} -{" "}
-                    {selectedColorName}. You can create this variant.
+                    Images exist for {selectedProductName} - {selectedColorName}
+                    . You can create this variant.
                   </p>
                 </div>
               </div>
@@ -462,17 +573,17 @@ const ProductVariantForm = ({ variant }: ProductVariantFormProps) => {
                   </p>
                   <p className="text-sm text-red-700 mt-1">
                     No images found for {selectedProductName} -{" "}
-                    {selectedColorName}. Please add images in the Product
-                    Listing form before creating this variant.
+                    {selectedColorName}. Please add images in the Product form
+                    before creating this variant.
                   </p>
                   <button
                     type="button"
                     onClick={() =>
-                      (window.location.href = "/admin/products/listing/new")
+                      (window.location.href = `/admin/products/edit/${watch("productId")}`)
                     }
                     className="mt-2 text-sm font-medium text-red-800 underline hover:text-red-900"
                   >
-                    Go to Product Listing Form
+                    Go to Product Form to Add Images
                   </button>
                 </div>
               </div>
