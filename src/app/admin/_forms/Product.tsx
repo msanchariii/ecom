@@ -5,6 +5,10 @@ import { useEffect, useState, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  NativeSelect,
+  NativeSelectOption,
+} from "@/components/ui/native-select";
 import { toast } from "sonner";
 import { Upload, X, Plus, Edit2 } from "lucide-react";
 import { uploadFileToS3 } from "@/lib/upload/client";
@@ -358,18 +362,14 @@ const ProductForm = ({ product }: ProductFormProps) => {
           <label htmlFor="categoryId" className="block text-sm font-medium">
             Category
           </label>
-          <select
-            id="categoryId"
-            {...register("categoryId")}
-            className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-          >
-            <option value="">Select a category</option>
+          <NativeSelect id="categoryId" {...register("categoryId")}>
+            <NativeSelectOption value="">Select a category</NativeSelectOption>
             {categories.map((cat) => (
-              <option key={cat.id} value={cat.id}>
+              <NativeSelectOption key={cat.id} value={cat.id}>
                 {cat.name}
-              </option>
+              </NativeSelectOption>
             ))}
-          </select>
+          </NativeSelect>
           {errors.categoryId && (
             <p className="text-sm text-red-500">{errors.categoryId.message}</p>
           )}
@@ -379,18 +379,14 @@ const ProductForm = ({ product }: ProductFormProps) => {
           <label htmlFor="genderId" className="block text-sm font-medium">
             Gender
           </label>
-          <select
-            id="genderId"
-            {...register("genderId")}
-            className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-          >
-            <option value="">Select a gender</option>
+          <NativeSelect id="genderId" {...register("genderId")}>
+            <NativeSelectOption value="">Select a gender</NativeSelectOption>
             {genders.map((gender) => (
-              <option key={gender.id} value={gender.id}>
+              <NativeSelectOption key={gender.id} value={gender.id}>
                 {gender.label}
-              </option>
+              </NativeSelectOption>
             ))}
-          </select>
+          </NativeSelect>
           {errors.genderId && (
             <p className="text-sm text-red-500">{errors.genderId.message}</p>
           )}
@@ -400,18 +396,14 @@ const ProductForm = ({ product }: ProductFormProps) => {
           <label htmlFor="brandId" className="block text-sm font-medium">
             Brand
           </label>
-          <select
-            id="brandId"
-            {...register("brandId")}
-            className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-          >
-            <option value="">Select a brand</option>
+          <NativeSelect id="brandId" {...register("brandId")}>
+            <NativeSelectOption value="">Select a brand</NativeSelectOption>
             {brands.map((brand) => (
-              <option key={brand.id} value={brand.id}>
+              <NativeSelectOption key={brand.id} value={brand.id}>
                 {brand.name}
-              </option>
+              </NativeSelectOption>
             ))}
-          </select>
+          </NativeSelect>
           {errors.brandId && (
             <p className="text-sm text-red-500">{errors.brandId.message}</p>
           )}
@@ -591,19 +583,19 @@ const ProductForm = ({ product }: ProductFormProps) => {
             Select Color to Add/Edit Images
           </label>
           <div className="flex gap-2">
-            <select
+            <NativeSelect
               id="imageColor"
               value={selectedColor}
               onChange={(e) => setSelectedColor(e.target.value)}
-              className="flex-1 md:flex-none md:w-80 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+              className="flex-1 md:flex-none md:w-80"
             >
-              <option value="">Choose a color</option>
+              <NativeSelectOption value="">Choose a color</NativeSelectOption>
               {colors.map((color) => (
-                <option key={color.id} value={color.id}>
+                <NativeSelectOption key={color.id} value={color.id}>
                   {color.name}
-                </option>
+                </NativeSelectOption>
               ))}
-            </select>
+            </NativeSelect>
             {selectedColor && (
               <div
                 className="w-10 h-10 rounded-md border border-gray-300 shrink-0"

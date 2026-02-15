@@ -16,6 +16,10 @@ import {
 } from "../_actions/products";
 import { getColors, getSizes } from "../_actions/filters";
 import { addVariant, updateVariant } from "../_actions/variants";
+import {
+  NativeSelect,
+  NativeSelectOption,
+} from "@/components/ui/native-select";
 
 type ProductColor = {
   id: string;
@@ -236,18 +240,14 @@ const ProductVariantForm = ({ variant }: ProductVariantFormProps) => {
         <label htmlFor="productId" className="block text-sm font-medium">
           Product <span className="text-red-500">*</span>
         </label>
-        <select
-          id="productId"
-          {...register("productId")}
-          className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-        >
-          <option value="">Select a product</option>
+        <NativeSelect id="productId" {...register("productId")}>
+          <NativeSelectOption value="">Select a fruit</NativeSelectOption>
           {products.map((product) => (
-            <option key={product.id} value={product.id}>
+            <NativeSelectOption key={product.id} value={product.id}>
               {product.name}
-            </option>
+            </NativeSelectOption>
           ))}
-        </select>
+        </NativeSelect>
         {errors.productId && (
           <p className="text-sm text-red-500">{errors.productId.message}</p>
         )}
@@ -408,18 +408,14 @@ const ProductVariantForm = ({ variant }: ProductVariantFormProps) => {
           <label htmlFor="sizeId" className="block text-sm font-medium">
             Size <span className="text-red-500">*</span>
           </label>
-          <select
-            id="sizeId"
-            {...register("sizeId")}
-            className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-          >
-            <option value="">Select a size</option>
+          <NativeSelect id="sizeId" {...register("sizeId")}>
+            <NativeSelectOption value="">Select a size</NativeSelectOption>
             {sizes.map((size) => (
-              <option key={size.id} value={size.id}>
+              <NativeSelectOption key={size.id} value={size.id}>
                 {size.name}
-              </option>
+              </NativeSelectOption>
             ))}
-          </select>
+          </NativeSelect>
           {errors.sizeId && (
             <p className="text-sm text-red-500">{errors.sizeId.message}</p>
           )}

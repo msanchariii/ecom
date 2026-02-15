@@ -7,6 +7,10 @@ import { z } from "zod";
 import { toast } from "sonner";
 import { Upload, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  NativeSelect,
+  NativeSelectOption,
+} from "@/components/ui/native-select";
 import { uploadFileToS3 } from "@/lib/upload/client";
 import {
   getProducts,
@@ -226,18 +230,14 @@ export const ProductListingForm = () => {
             <label htmlFor="productId" className="block text-sm font-medium">
               Product <span className="text-red-500">*</span>
             </label>
-            <select
-              id="productId"
-              {...register("productId")}
-              className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-            >
-              <option value="">Select a product</option>
+            <NativeSelect id="productId" {...register("productId")}>
+              <NativeSelectOption value="">Select a product</NativeSelectOption>
               {products.map((product) => (
-                <option key={product.id} value={product.id}>
+                <NativeSelectOption key={product.id} value={product.id}>
                   {product.name}
-                </option>
+                </NativeSelectOption>
               ))}
-            </select>
+            </NativeSelect>
             {errors.productId && (
               <p className="text-sm text-red-500">{errors.productId.message}</p>
             )}
@@ -248,18 +248,18 @@ export const ProductListingForm = () => {
               Color <span className="text-red-500">*</span>
             </label>
             <div className="flex gap-2">
-              <select
+              <NativeSelect
                 id="colorId"
                 {...register("colorId")}
-                className="flex-1 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                className="flex-1"
               >
-                <option value="">Select a color</option>
+                <NativeSelectOption value="">Select a color</NativeSelectOption>
                 {colors.map((color) => (
-                  <option key={color.id} value={color.id}>
+                  <NativeSelectOption key={color.id} value={color.id}>
                     {color.name}
-                  </option>
+                  </NativeSelectOption>
                 ))}
-              </select>
+              </NativeSelect>
               {selectedColorId && (
                 <div
                   className="w-10 h-10 rounded-md border border-gray-300"
