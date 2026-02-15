@@ -18,12 +18,17 @@ const NAV_LINKS = [
 export default function Navbar() {
   const [open, setOpen] = useState(false);
   const [user, setUser] = useState<any>(null);
-  const { getItemCount } = useCartStore();
-  const cartCount = getItemCount();
+  const [cartCount, setCartCount] = useState(0);
+  const items = useCartStore((state) => state.items);
 
   useEffect(() => {
     getCurrentUser().then((userData) => setUser(userData));
   }, []);
+
+  useEffect(() => {
+    const count = items.reduce((sum, item) => sum + item.quantity, 0);
+    setCartCount(count);
+  }, [items]);
 
   return (
     <header className="sticky top-0 z-50 bg-light-100 shadow">

@@ -8,8 +8,9 @@ const jost = Jost({
 });
 
 export const metadata: Metadata = {
-  title: "Nike",
-  description: "An e-commerce platform for Nike shoes",
+  title: "SteadFast",
+  description:
+    "A Demo e-commerce platform built with Next.js 13 and TypeScript. Browse our collection of shoes, add to cart, and enjoy a seamless shopping experience.",
 };
 
 export default function RootShell({
