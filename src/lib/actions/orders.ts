@@ -5,6 +5,7 @@ import { orders, orderItems, productVariants, products } from "@/lib/db/schema";
 import { eq, desc } from "drizzle-orm";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
+import { revalidatePath } from "next/cache";
 
 export type OrderWithItems = {
   id: string;
@@ -81,4 +82,70 @@ export async function getUserOrders(): Promise<OrderWithItems[]> {
     createdAt: order.orderCreatedAt,
     items: order.items,
   }));
+}
+
+export interface CreateOrderData {
+  items: Array<{
+    variantId: string;
+    quantity: number;
+    price: number;
+  }>;
+  shippingAddressId: string;
+  billingAddressId: string;
+  totalAmount: number;
+  paymentId?: string;
+  razorpayOrderId?: string;
+}
+
+export async function createOrder(
+  data: CreateOrderData,
+): Promise<{ success: boolean; error?: string; orderId?: string }> {
+  const session = await auth.api.getSession({
+    headers: await headers(),
+  });
+
+  if (!session?.user?.id) {
+    return { success: false, error: "Unauthorized" };
+  }
+
+  try {
+    // Create the order
+    const [newOrder] = await db
+      .insert(orders)
+      .values({
+        userId: session.user.id,
+        status: "paid",
+        totalAmount: data.totalAmount.toString(),
+        shippingAddressId: data.shippingAddressId,
+        billingAddressId: data.billingAddressId,
+      })
+      .returning();
+
+    // Create order items
+    const orderItemsData = data.items.map((item) => ({
+      orderId: newOrder.id,
+      productVariantId: item.variantId,
+      quantity: item.quantity,
+      priceAtPurchase: item.price.toString(),
+    }));
+
+    await db.insert(orderItems).values(orderItemsData);
+
+    // Revalidate orders page
+    revalidatePath("/me/orders");
+
+    console.log("Order created successfully:", {
+      orderId: newOrder.id,
+      userId: session.user.id,
+      totalAmount: data.totalAmount,
+      itemsCount: data.items.length,
+      paymentId: data.paymentId,
+      razorpayOrderId: data.razorpayOrderId,
+    });
+
+    return { success: true, orderId: newOrder.id };
+  } catch (error) {
+    console.error("Failed to create order:", error);
+    return { success: false, error: "Failed to create order" };
+  }
 }

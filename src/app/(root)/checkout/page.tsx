@@ -6,6 +6,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useCartStore } from "@/store/cart";
 import { getUserAddresses } from "@/lib/actions/addresses";
+import { createOrder } from "@/lib/actions/orders";
 import type { SelectAddress } from "@/lib/db/schema";
 import Payment from "@/components/Payment";
 import { MapPin, ShoppingBag, ArrowLeft } from "lucide-react";
@@ -95,26 +96,36 @@ export default function CheckoutPage() {
     paymentId: string;
   }) => {
     console.log("Payment successful:", paymentData);
-    console.log("Creating order with details:", {
-      userId: user?.id,
-      items: items.map((item) => ({
-        variantId: item.id, // item.id is the variantId
-        quantity: item.quantity,
-        price: item.price,
-      })),
-      shippingAddressId,
-      billingAddressId,
-      totalAmount: finalTotal,
-      razorpayOrderId: paymentData.orderId,
-      razorpayPaymentId: paymentData.paymentId,
-    });
 
-    // TODO: Create order in database here
-    // await createOrder({ ... })
+    try {
+      // Create order in database
+      const result = await createOrder({
+        items: items.map((item) => ({
+          variantId: item.id, // item.id is the variantId
+          quantity: item.quantity,
+          price: item.price,
+        })),
+        shippingAddressId,
+        billingAddressId,
+        totalAmount: finalTotal,
+        paymentId: paymentData.paymentId,
+        razorpayOrderId: paymentData.orderId,
+      });
 
-    toast.success("Order placed successfully!");
-    clearCart();
-    router.push("/me/orders");
+      if (!result.success) {
+        throw new Error(result.error || "Failed to create order");
+      }
+
+      console.log("Order created successfully:", result.orderId);
+      toast.success("Order placed successfully!");
+      clearCart();
+      router.push("/me/orders");
+    } catch (error) {
+      console.error("Failed to create order:", error);
+      toast.error(
+        "Payment successful but failed to create order. Please contact support.",
+      );
+    }
   };
 
   const handlePaymentFailure = (error: Error) => {

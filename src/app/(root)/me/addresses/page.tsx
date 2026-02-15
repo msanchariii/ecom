@@ -27,6 +27,7 @@ export default function AddressesPage() {
     state: "",
     country: "",
     postalCode: "",
+    phone: "",
     isDefault: false,
   });
   const [submitting, setSubmitting] = useState(false);
@@ -88,6 +89,7 @@ export default function AddressesPage() {
       state: address.state,
       country: address.country,
       postalCode: address.postalCode,
+      phone: address.phone,
       isDefault: address.isDefault,
     });
     setShowForm(true);
@@ -120,6 +122,7 @@ export default function AddressesPage() {
       state: "",
       country: "",
       postalCode: "",
+      phone: "",
       isDefault: false,
     });
     setEditingAddress(null);
@@ -262,6 +265,22 @@ export default function AddressesPage() {
               </div>
             </div>
 
+            <div>
+              <label className="mb-2 block text-body-medium font-medium text-dark-900">
+                Phone Number
+              </label>
+              <input
+                type="tel"
+                value={formData.phone}
+                onChange={(e) =>
+                  setFormData({ ...formData, phone: e.target.value })
+                }
+                className="w-full rounded-md border border-light-300 px-4 py-2 text-body text-dark-900 focus:border-dark-900 focus:outline-none"
+                placeholder="+1 (555) 123-4567"
+                required
+              />
+            </div>
+
             <div className="flex items-center gap-2">
               <input
                 type="checkbox"
@@ -357,6 +376,9 @@ export default function AddressesPage() {
                 </p>
                 <p>{address.country}</p>
                 <p>{address.postalCode}</p>
+                <p className="mt-2 text-body-medium font-medium text-dark-900">
+                  {address.phone}
+                </p>
               </div>
             </div>
           ))}

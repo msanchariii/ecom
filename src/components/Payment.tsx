@@ -29,19 +29,6 @@ interface PaymentProps {
   notes?: Record<string, string>;
 }
 
-/*
- *
- * Usage:
- * ```tsx
- * <Payment
- *   amountInRupees={100}
- *   customerData={{ firstName: "John", lastName: "Doe", email: "john@example.com" }}
- *   onPaymentSuccess={(data) => console.log("Success:", data)}
- * >
- *   Pay Now
- * </Payment>
- * ```
- */
 const Payment: React.FC<PaymentProps> = ({
   amountInRupees,
   onPaymentSuccess,
@@ -61,11 +48,6 @@ const Payment: React.FC<PaymentProps> = ({
 
   // Convert rupees to paise (smallest currency unit)
   const amountInPaise = amountInRupees * 100;
-
-  /**
-   * Verify payment on server-side
-   * This is critical for security - never trust client-side verification alone
-   */
   const verifyPayment = useCallback(
     async (response: RazorpaySuccessResponse): Promise<boolean> => {
       try {
