@@ -28,49 +28,43 @@ export default function OrdersPage() {
 
   if (loading) {
     return (
-      <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-center py-12">
-          <p className="text-body text-dark-600">Loading your orders...</p>
-        </div>
+      <div className="flex items-center justify-center py-12">
+        <p className="text-body text-dark-600">Loading your orders...</p>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
-        <div className="flex flex-col items-center justify-center py-12">
-          <p className="text-body text-red-600 mb-4">{error}</p>
-          <Link
-            href="/"
-            className="inline-flex items-center gap-2 rounded-md bg-dark-900 px-6 py-3 text-body font-medium text-light-100 transition-colors hover:bg-dark-700"
-          >
-            <ArrowLeft className="h-5 w-5" />
-            Go Home
-          </Link>
-        </div>
+      <div className="flex flex-col items-center justify-center py-12">
+        <p className="text-body text-red-600 mb-4">{error}</p>
+        <Link
+          href="/"
+          className="inline-flex items-center gap-2 rounded-md bg-dark-900 px-6 py-3 text-body font-medium text-light-100 transition-colors hover:bg-dark-700"
+        >
+          <ArrowLeft className="h-5 w-5" />
+          Go Home
+        </Link>
       </div>
     );
   }
 
   if (orders.length === 0) {
     return (
-      <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
-        <div className="flex flex-col items-center justify-center py-12">
-          <Package className="h-24 w-24 text-dark-300 mb-6" />
-          <h2 className="text-heading-2 text-dark-900 mb-4">No orders yet</h2>
-          <p className="text-body text-dark-600 mb-8">
-            You haven't placed any orders yet. Start shopping to create your
-            first order!
-          </p>
-          <Link
-            href="/products"
-            className="inline-flex items-center gap-2 rounded-md bg-dark-900 px-6 py-3 text-body font-medium text-light-100 transition-colors hover:bg-dark-700"
-          >
-            <Package className="h-5 w-5" />
-            Browse Products
-          </Link>
-        </div>
+      <div className="flex flex-col items-center justify-center py-12">
+        <Package className="h-24 w-24 text-dark-300 mb-6" />
+        <h2 className="text-heading-2 text-dark-900 mb-4">No orders yet</h2>
+        <p className="text-body text-dark-600 mb-8">
+          You haven't placed any orders yet. Start shopping to create your first
+          order!
+        </p>
+        <Link
+          href="/products"
+          className="inline-flex items-center gap-2 rounded-md bg-dark-900 px-6 py-3 text-body font-medium text-light-100 transition-colors hover:bg-dark-700"
+        >
+          <Package className="h-5 w-5" />
+          Browse Products
+        </Link>
       </div>
     );
   }
@@ -95,9 +89,8 @@ export default function OrdersPage() {
   };
 
   return (
-    <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-      <div className="mb-8">
-        <h1 className="text-heading-1 text-dark-900 mb-2">My Orders</h1>
+    <div>
+      <div className="mb-6">
         <p className="text-body text-dark-600">
           {orders.length} {orders.length === 1 ? "order" : "orders"} found
         </p>
@@ -168,6 +161,6 @@ export default function OrdersPage() {
         <ArrowLeft className="h-4 w-4" />
         Continue Shopping
       </Link>
-    </main>
+    </div>
   );
 }

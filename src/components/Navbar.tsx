@@ -8,9 +8,8 @@ import { ShoppingCart, TextAlignJustify, Package } from "lucide-react";
 import { getCurrentUser } from "@/lib/auth/actions";
 
 const NAV_LINKS = [
-  { label: "Men", href: "/products?gender=men" },
-  { label: "Women", href: "/products?gender=women" },
-  { label: "Kids", href: "/products?gender=unisex" },
+  { label: "Products", href: "/products" },
+  { label: "Unisex", href: "/products?gender=unisex" },
   { label: "Collections", href: "/collections" },
   { label: "Contact", href: "/contact" },
 ] as const;
@@ -63,7 +62,7 @@ export default function Navbar() {
         <div className="hidden items-center gap-6 md:flex">
           {user != null ? (
             <Link
-              href="/orders"
+              href="/me/orders"
               className="flex gap-2 items-center text-body text-dark-900 transition-colors hover:text-dark-700"
             >
               <Package /> My Orders
@@ -110,7 +109,7 @@ export default function Navbar() {
           ))}
           <li className="flex flex-col gap-2 pt-2">
             <Link
-              href="/orders"
+              href="/me/orders"
               className="text-body text-dark-900 hover:text-dark-700"
               onClick={() => setOpen(false)}
             >
